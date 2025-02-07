@@ -1,29 +1,26 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-
-const message = ref('');
-
-onMounted(async () => {
-  try {
-    const res = await fetch(import.meta.env.VITE_BACKEND_BASE_URL + '/');
-    if (res.ok) {
-      message.value = 'Backend radi!';
-    } else {
-      message.value = 'Greška!';
-    }
-  } catch (error) {
-    console.error('Greška:', error);
-    message.value = 'Greška!';
-  }
-});
 </script>
 
 <template>
-  <p style="text-align: center; font-size: 1.2em; color: #333; margin-top: 20px;">{{ message }}</p>
+  <div class="fullscreen-background">
+    <img src="/src/assets/FutsalHome.jpg" alt="Futsal Home" class="fullscreen-image" />
+  </div>
 </template>
 
 <style scoped>
-p {
-  font-weight: bold;
+.fullscreen-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+}
+
+.fullscreen-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.4;
 }
 </style>
