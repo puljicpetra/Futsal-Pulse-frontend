@@ -66,12 +66,28 @@ nav.navbar {
   height: 120px;
   width: auto;
   position: absolute;
-  left: 50%; 
-  top: -30px; 
-  transform: translateX(-50%); 
-  z-index: 1000; 
+  left: 50%;
+  top: -30px;
+  transform: translateX(-50%);
+  z-index: 1000;
   border: 2px solid #fff;
-  border-radius: 20px; 
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1); 
+  border-radius: 20px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease-in-out;
 }
+
+.navbar-logo:hover {
+  transform: translateX(-50%) scale(1.2);
+}
+
+.nav-link {
+  color: #000;
+  font-weight: bold;
+  transition: color 0.3s ease-in-out;
+}
+
+.nav-link:hover {
+  color: #FF0133;
+}
+
 </style>
