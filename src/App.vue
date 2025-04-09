@@ -1,46 +1,55 @@
 <script setup>
+import { useRoute } from 'vue-router';
+import { computed } from 'vue';
+
+const route = useRoute();
+const authPages = ['/login', '/register'];
+const isAuthPage = computed(() => authPages.includes(route.path));
 </script>
+
 
 <template>
   <div id="app">
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
-      <div class="container-fluid">
-        <a class="navbar-brand" href="#">
-          <img
-            src="@/assets/FutsalPulseLogo.jpg"
-            alt="Futsal Pulse Logo"
-            class="navbar-logo"
-          />
-        </a>
-        <button
-          class="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarNav"
-          aria-controls="navbarNav"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
-        >
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-          <ul class="navbar-nav">
-            <li class="nav-item">
-              <router-link to="/" class="nav-link">Početna</router-link>
-            </li>
-            <li class="nav-item">
-              <router-link to="/tournaments" class="nav-link">Turniri</router-link>
-            </li>
-            <li class="nav-item">
-              <router-link to="/matches" class="nav-link">Utakmice</router-link>
-            </li>
-            <li class="nav-item">
-              <router-link to="/teams" class="nav-link">Timovi</router-link>
-            </li>
-          </ul>
+    <div v-if="!isAuthPage">
+      <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="#">
+            <img
+              src="@/assets/FutsalPulseLogo.jpg"
+              alt="Futsal Pulse Logo"
+              class="navbar-logo"
+            />
+          </a>
+          <button
+            class="navbar-toggler"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#navbarNav"
+            aria-controls="navbarNav"
+            aria-expanded="false"
+            aria-label="Toggle navigation"
+          >
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+              <li class="nav-item">
+                <router-link to="/" class="nav-link">Početna</router-link>
+              </li>
+              <li class="nav-item">
+                <router-link to="/tournaments" class="nav-link">Turniri</router-link>
+              </li>
+              <li class="nav-item">
+                <router-link to="/matches" class="nav-link">Utakmice</router-link>
+              </li>
+              <li class="nav-item">
+                <router-link to="/teams" class="nav-link">Timovi</router-link>
+              </li>
+            </ul>
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </div>
 
     <router-view />
   </div>
