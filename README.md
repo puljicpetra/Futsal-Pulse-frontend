@@ -23,7 +23,7 @@ Ovo je korisničko sučelje aplikacije **Futsal Pulse**, web aplikacije za organ
 - Dodavanje lokacija i termina
 - Upravljanje prijavama timova
 
-### 🧑‍🦱 Igrači
+### 🧑 Igrači
 - Registracija i prijava za turnire
 - Pregled rezultata i osobne statistike
 - Komentiranje i ocjenjivanje turnira
