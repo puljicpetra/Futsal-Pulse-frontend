@@ -1,12 +1,18 @@
 <script setup>
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { computed } from 'vue';
 
 const route = useRoute();
+const router = useRouter();
+
 const authPages = ['/login', '/register'];
 const isAuthPage = computed(() => authPages.includes(route.path));
-</script>
 
+const logout = () => {
+  localStorage.removeItem('token');
+  router.push('/login');
+};
+</script>
 
 <template>
   <div id="app">
@@ -31,7 +37,7 @@ const isAuthPage = computed(() => authPages.includes(route.path));
           >
             <span class="navbar-toggler-icon"></span>
           </button>
-          <div class="collapse navbar-collapse" id="navbarNav">
+          <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNav">
             <ul class="navbar-nav">
               <li class="nav-item">
                 <router-link to="/" class="nav-link">Početna</router-link>
@@ -46,6 +52,7 @@ const isAuthPage = computed(() => authPages.includes(route.path));
                 <router-link to="/teams" class="nav-link">Timovi</router-link>
               </li>
             </ul>
+            <button class="logout-button" @click="logout">Logout</button>
           </div>
         </div>
       </nav>
@@ -99,4 +106,20 @@ nav.navbar {
   color: #FF0133;
 }
 
+.logout-button {
+  background-color: #000;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  margin-right: 10px;
+}
+
+.logout-button:hover {
+  background-color: #FF0133;
+  color: #fff;
+}
 </style>
