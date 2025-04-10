@@ -39,7 +39,7 @@
 </template>
   
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
   
@@ -48,7 +48,15 @@ const password = ref('');
 const remember = ref(false);
 const error = ref('');
 const router = useRouter();
-  
+
+onMounted(() => {
+  const savedUsername = localStorage.getItem('savedUsername');
+  if (savedUsername) {
+    username.value = savedUsername;
+    remember.value = true;
+  }
+});
+
 async function login() {
     try {
       const res = await axios.post('http://localhost:3001/login', {
@@ -57,9 +65,16 @@ async function login() {
       });
   
       localStorage.setItem('token', res.data.jwt_token);
+
+      if (remember.value) {
+        localStorage.setItem('savedUsername', username.value);
+      } else {
+        localStorage.removeItem('savedUsername');
+      }
+
       router.push('/');
     } catch (err) {
-      error.value = 'Neispravni podaci za prijavu';
+      error.value = 'Invalid login credentials';
     }
 }
 </script>
