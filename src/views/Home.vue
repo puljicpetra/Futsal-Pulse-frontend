@@ -1,129 +1,85 @@
 <template>
   <div class="home">
-    <div class="background-image"></div>
+    <video autoplay muted loop playsinline class="video-background">
+      <source src="@/assets/futsal-pulse-video.mp4" type="video/mp4" />
+    </video>
 
-    <div class="futsal-title-container">
-      <h1 class="futsal-title">FUTSAL</h1>
-      <h1 class="futsal-title pulse-title">PULSE</h1>
-    </div>
-
-    <v-card class="grid-card">
-      <div class="grid-title-container">
-        <h2 class="grid-title">Najpopularnije lokacije</h2>
+    <div class="overlay">
+      <div class="text-overlay-bg">
+        <div class="title-section">
+          <h1 class="main-title">Welcome to</h1>
+          <h2 class="highlight-title">FUTSAL PULSE</h2>
+          <p class="subtitle">Explore top futsal destinations and join the excitement.</p>
+        </div>
       </div>
-
-      <v-container fluid>
-        <v-row dense>
-          <v-col
-            v-for="card in cards"
-            :key="card.title"
-            :cols="card.flex"
-          >
-            <v-card>
-              <v-img
-                :src="card.src"
-                class="align-end"
-                gradient="to bottom, rgba(0,0,0,.1), rgba(0,0,0,.5)"
-                height="200px"
-                cover
-              >
-                <v-card-title class="text-white">{{ card.title }}</v-card-title>
-              </v-img>
-
-              <v-card-actions>
-                <v-spacer></v-spacer>
-                <v-btn color="medium-emphasis" icon="mdi-heart" size="small"></v-btn>
-                <v-btn color="medium-emphasis" icon="mdi-bookmark" size="small"></v-btn>
-                <v-btn color="medium-emphasis" icon="mdi-share-variant" size="small"></v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-card>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-
-const cards = ref([
-  { title: 'Zagreb', src: 'https://i.natgeofe.com/n/a11e9ead-955f-4a4e-977c-d1b2f104ee75/zagrebgettyimages-1144074611hr_3x2.jpg', flex: 12 },
-  { title: 'Split', src: 'https://travelwandergrow.com/wp-content/uploads/2019/10/Split-Header-Image-2-scaled.jpeg', flex: 6 },
-  { title: 'Pula', src: 'https://visitteo.com/wp-content/uploads/2023/08/nas02.jpg', flex: 6 },
-]);
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Fugaz+One&display=swap');
 
 .home {
+  position: relative;
   width: 100vw;
   height: 100vh;
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   overflow: hidden;
 }
 
-.background-image {
+.video-background {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: url('@/assets/FutsalHome.jpg') no-repeat center center;
-  background-size: cover;
-  background-attachment: fixed;
-  opacity: 0.4;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.overlay {
+  position: relative;
   z-index: 1;
-}
-
-.futsal-title-container {
-  position: absolute;
-  left: 40px;
-  bottom: 80px; 
-  z-index: 2;
+  height: 100%;
   display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.futsal-title {
-  font-family: 'Fugaz One', serif;
-  font-size: 5rem;
-  margin: 0 0 20px 0;
-  line-height: 1;
-  text-transform: uppercase;
-  font-weight: bold;
-  color: #000;
-}
-
-.pulse-title {
-  margin-top: 0;
-}
-
-.grid-card {
-  position: absolute;
-  right: 40px;
-  top: 45%;
-  transform: translateY(-50%);
-  width: 500px;
-  z-index: 2;
-  margin-bottom: 40px;
-}
-
-.grid-title-container {
+  align-items: center;
+  justify-content: center;
   padding: 20px;
+}
+
+.text-overlay-bg {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 40px;
+  border-radius: 12px;
+  max-width: 90%;
   text-align: center;
 }
 
-.grid-title {
-  font-family: 'Fugaz One', serif;
-  font-size: 2rem;
+.title-section {
+  color: white;
+}
+
+.main-title {
+  font-size: 2.5rem;
   margin: 0;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.highlight-title {
+  font-family: 'Fugaz One', sans-serif;
+  font-size: 4rem;
+  margin: 10px 0;
+  color: #00AEEF;
   text-transform: uppercase;
-  color: #000;
+  -webkit-text-stroke: 1px #002D72;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.subtitle {
+  font-size: 1.1rem;
+  margin-top: 10px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
 }
 </style>
