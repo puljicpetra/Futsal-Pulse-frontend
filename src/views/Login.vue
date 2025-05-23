@@ -65,6 +65,7 @@ async function login() {
       });
   
       localStorage.setItem('token', res.data.jwt_token);
+      localStorage.setItem('userRole', res.data.role);
 
       if (remember.value) {
         localStorage.setItem('savedUsername', username.value);
@@ -75,6 +76,7 @@ async function login() {
       router.push('/');
     } catch (err) {
       error.value = 'Invalid login credentials';
+      localStorage.removeItem('userRole');
     }
 }
 </script>

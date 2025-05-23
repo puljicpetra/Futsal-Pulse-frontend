@@ -1,6 +1,6 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -8,15 +8,50 @@ const router = useRouter();
 const authPages = ['/login', '/register'];
 const isAuthPage = computed(() => authPages.includes(route.path));
 
+const token = ref(localStorage.getItem('token'));
+const userRole = ref(localStorage.getItem('userRole'));
+
+const isLoggedIn = computed(() => !!token.value);
+
 const logout = () => {
   localStorage.removeItem('token');
+  localStorage.removeItem('userRole');
+  token.value = null;
+  userRole.value = null; 
   router.push('/login');
 };
+
+const updateAuthDataFromStorage = () => {
+  const storedToken = localStorage.getItem('token');
+  token.value = storedToken;
+
+  if (storedToken) {
+    userRole.value = localStorage.getItem('userRole');
+  } else {
+    userRole.value = null;
+  }
+};
+
+watch(
+  () => route.path,
+  () => {
+    updateAuthDataFromStorage();
+  },
+  { immediate: true }
+);
+
+const formattedUserRole = computed(() => {
+  if (userRole.value) {
+    return userRole.value.charAt(0).toUpperCase() + userRole.value.slice(1);
+  }
+  return '';
+});
+
 </script>
 
 <template>
   <div id="app">
-    <div v-if="!isAuthPage">
+    <div v-if="!isAuthPage && isLoggedIn">
       <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
           <a class="navbar-brand" href="#">
@@ -52,7 +87,12 @@ const logout = () => {
                 <router-link to="/teams" class="nav-link">Timovi</router-link>
               </li>
             </ul>
-            <button class="logout-button" @click="logout">Logout</button>
+            <div class="d-flex align-items-center">
+              <span v-if="userRole" class="navbar-text me-3">
+                Prijavljeni ste kao: {{ formattedUserRole }}
+              </span>
+              <button class="logout-button" @click="logout">Logout</button>
+            </div>
           </div>
         </div>
       </nav>
@@ -121,5 +161,10 @@ nav.navbar {
 .logout-button:hover {
   background-color: #FF0133;
   color: #fff;
+}
+
+.navbar-text { 
+  color: #333;
+  font-weight: 500;
 }
 </style>

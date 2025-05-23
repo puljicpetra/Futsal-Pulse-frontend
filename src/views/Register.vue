@@ -61,20 +61,49 @@ const success = ref('');
 const router = useRouter();
 
 async function register() {
+  error.value = '';
+  success.value = '';
+
+  if (!role.value) {
+    error.value = 'Please select a role.';
+    return;
+  }
+
   try {
-    await axios.post('http://localhost:3001/register', {
+    const response = await axios.post('http://localhost:3001/register', {
       username: username.value,
       email: email.value,
       password: password.value,
       role: role.value
     });
 
-    success.value = 'Registration successful! Redirecting to login...';
+    success.value = response.data.message || 'Registration successful! Redirecting to login...';
     setTimeout(() => {
       router.push('/login');
     }, 1500);
+
   } catch (err) {
-    error.value = 'Username or email already exists or error occurred.';
+    if (err.response) {
+      console.error("Backend error response data:", err.response.data);
+      console.error("Backend error response status:", err.response.status);
+
+      if (err.response.data && err.response.data.errors && Array.isArray(err.response.data.errors)) {
+        error.value = err.response.data.errors.map(e => e.msg).join(' ');
+      } else if (err.response.data && typeof err.response.data === 'string') {
+        error.value = err.response.data;
+      } else if (err.response.data && err.response.data.message) {
+         error.value = err.response.data.message;
+      }
+       else {
+        error.value = 'An unknown error occurred during registration. Please try again.';
+      }
+    } else if (err.request) {
+      console.error("No response received:", err.request);
+      error.value = 'No response from the server. Please check your network connection.';
+    } else {
+      console.error('Error setting up request:', err.message);
+      error.value = 'Error in request setup: ' + err.message;
+    }
   }
 }
 </script>
