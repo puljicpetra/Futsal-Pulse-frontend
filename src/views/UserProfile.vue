@@ -255,13 +255,4 @@ onMounted(() => {
   background-color: #d4edda;
   border: 1px solid #c3e6cb;
 }
-
-/* Using Bootstrap classes for buttons, inputs, form-groups but you can style them custom too */
-/* Example custom button styling if not using Bootstrap fully */
-/*
-.btn-primary { background-color: #007bff; border-color: #007bff; color: white; }
-.btn-success { background-color: #28a745; border-color: #28a745; color: white; }
-.btn-secondary { background-color: #6c757d; border-color: #6c757d; color: white; }
-.btn:hover { opacity: 0.9; }
-*/
 </style>
