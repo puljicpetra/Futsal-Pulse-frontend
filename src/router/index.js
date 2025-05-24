@@ -5,6 +5,7 @@ import Register from '@/views/Register.vue';
 import Tournaments from '@/views/Tournaments.vue';
 import Matches from '@/views/Matches.vue';
 import Teams from '@/views/Teams.vue';
+import UserProfile from '@/views/UserProfile.vue';
 
 const routes = [
   {
@@ -39,6 +40,12 @@ const routes = [
     path: '/teams',
     name: 'Teams',
     component: Teams,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile',
+    name: 'UserProfile', 
+    component: UserProfile, 
     meta: { requiresAuth: true }
   }
 ];
