@@ -80,16 +80,16 @@ const formattedUserRole = computed(() => {
           <div class="collapse navbar-collapse d-flex justify-content-between" id="navbarNav">
             <ul class="navbar-nav">
               <li class="nav-item">
-                <router-link to="/" class="nav-link">Početna</router-link>
+                <router-link to="/" class="nav-link">Home</router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/tournaments" class="nav-link">Turniri</router-link>
+                <router-link to="/tournaments" class="nav-link">Tournaments</router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/matches" class="nav-link">Utakmice</router-link>
+                <router-link to="/matches" class="nav-link">Matches</router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/teams" class="nav-link">Timovi</router-link>
+                <router-link to="/teams" class="nav-link">Teams</router-link>
               </li>
             </ul>
             <div class="d-flex align-items-center ms-auto" v-if="isLoggedIn">
