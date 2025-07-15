@@ -1,10 +1,34 @@
 <template>
   <div class="user-profile-container">
-    <div v-if="isLoading" class="loading-message">Loading profile...</div>
+    <div v-if="isLoading" class="loading-message">Loading...</div>
     <div v-if="fetchError" class="error-message">{{ fetchError }}</div>
 
     <div v-if="user && !isLoading" class="profile-card">
-      <h2>My Profile</h2>
+      
+      <div class="profile-header">
+        <div class="avatar-container">
+          <img 
+            v-if="user.profile_image_url" 
+            :src="`http://localhost:3001${user.profile_image_url}`" 
+            alt="Profile Avatar" 
+            class="profile-avatar"
+          />
+          <div v-else class="profile-avatar-placeholder">
+            <i class="fas fa-user"></i>
+          </div>
+          <input 
+            type="file" 
+            @change="onFileSelected" 
+            ref="fileInput" 
+            style="display: none;" 
+            accept="image/png, image/jpeg"
+          />
+          <button @click="$refs.fileInput.click()" class="btn-change-avatar" title="Change profile picture">
+            <i class="fas fa-camera"></i>
+          </button>
+        </div>
+        <h2>My Profile</h2>
+      </div>
 
       <div v-if="!isEditing" class="profile-view">
         <div class="profile-field">
@@ -25,7 +49,7 @@
         <div class="profile-field">
           <strong>Contact Phone:</strong> {{ user.contact_phone || 'Not set' }}
         </div>
-        <button @click="enableEditMode" class="btn btn-primary mt-3">Edit Profile</button>
+        <button @click="enableEditMode" class="btn btn-primary mt-4">Edit Profile Info</button>
       </div>
 
       <form v-if="isEditing" @submit.prevent="saveProfile" class="profile-edit-form">
@@ -67,6 +91,7 @@ const isEditing = ref(false);
 const isSaving = ref(false);
 const saveError = ref('');
 const saveSuccess = ref('');
+const fileInput = ref(null);
 
 const formattedRole = computed(() => {
   if (user.value && user.value.role) {
@@ -75,11 +100,9 @@ const formattedRole = computed(() => {
   return '';
 });
 
-
 const fetchUserProfile = async () => {
   isLoading.value = true;
   fetchError.value = '';
-  
   try {
     const response = await apiClient.get('/api/users/me');
     user.value = response.data;
@@ -112,24 +135,20 @@ const saveProfile = async () => {
   isSaving.value = true;
   saveError.value = '';
   saveSuccess.value = '';
-  
   try {
     const dataToUpdate = {
       full_name: editableUser.value.full_name,
       bio: editableUser.value.bio,
       contact_phone: editableUser.value.contact_phone,
     };
-
     const response = await apiClient.put('/api/users/me', dataToUpdate);
-
     user.value = response.data;
     isEditing.value = false;
     saveSuccess.value = 'Profile updated successfully!';
     setTimeout(() => saveSuccess.value = '', 3000);
-
   } catch (err) {
     console.error('Failed to save profile:', err);
-    if (err.response && err.response.data) {
+    if (err.response?.data) {
         if (Array.isArray(err.response.data.errors)) {
              saveError.value = err.response.data.errors.map(e => e.msg).join(' ');
         } else if (err.response.data.message) {
@@ -142,6 +161,37 @@ const saveProfile = async () => {
     }
   } finally {
     isSaving.value = false;
+  }
+};
+
+const onFileSelected = (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  uploadProfileImage(file);
+};
+
+const uploadProfileImage = async (file) => {
+  isLoading.value = true;
+  fetchError.value = '';
+  
+  const formData = new FormData();
+  formData.append('avatar', file);
+
+  try {
+    const response = await apiClient.post('/api/users/me/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    if (user.value) {
+      user.value.profile_image_url = response.data.profile_image_url;
+    }
+  } catch (error) {
+    console.error('Image upload failed:', error);
+    fetchError.value = error.response?.data?.message || 'Failed to upload image. Please try again.';
+    setTimeout(() => fetchError.value = '', 4000);
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -160,16 +210,72 @@ onMounted(() => {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.avatar-container {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.profile-avatar, .profile-avatar-placeholder {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.profile-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e9ecef;
+  color: #adb5bd;
+  font-size: 50px;
+}
+
+.btn-change-avatar {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #007bff;
+  color: white;
+  border: 2px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  padding: 0;
+}
+
+.btn-change-avatar:hover {
+  background-color: #0056b3;
+}
+
 .profile-card h2 {
-  text-align: center;
   color: #333;
-  margin-bottom: 1.5rem;
+  margin: 0;
 }
 
 .profile-view .profile-field {
   margin-bottom: 1rem;
   font-size: 1.1rem;
   color: #555;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.75rem;
+}
+.profile-view .profile-field:last-of-type {
+  border-bottom: none;
 }
 .profile-view .profile-field strong {
   color: #333;
