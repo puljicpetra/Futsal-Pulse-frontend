@@ -33,7 +33,6 @@ export const useAuthStore = defineStore('auth', () => {
         userRole.value = null;
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
-        localStorage.removeItem('savedUsername');
         router.push('/login');
     }
 

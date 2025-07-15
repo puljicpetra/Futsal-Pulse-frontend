@@ -18,12 +18,6 @@
             required
           />
 
-          <div class="options">
-            <input type="checkbox" id="remember" v-model="remember" />
-            <label for="remember">Remember me</label>
-            <a href="#">Forgot Password?</a>
-          </div>
-
           <button type="submit" :disabled="isLoggingIn">
             {{ isLoggingIn ? 'Logging in...' : 'Login' }}
           </button>
@@ -41,23 +35,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 
 const authStore = useAuthStore();
 const username = ref('');
 const password = ref('');
-const remember = ref(false);
 const error = ref('');
 const isLoggingIn = ref(false);
 
-onMounted(() => {
-  const savedUsername = localStorage.getItem('savedUsername');
-  if (savedUsername) {
-    username.value = savedUsername;
-    remember.value = true;
-  }
-});
 
 async function login() {
   if (isLoggingIn.value) return;
@@ -67,12 +53,6 @@ async function login() {
 
   try {
     await authStore.login(username.value, password.value);
-
-    if (remember.value) {
-      localStorage.setItem('savedUsername', username.value);
-    } else {
-      localStorage.removeItem('savedUsername');
-    }
 
   } catch (err) {
     error.value = 'Invalid login credentials. Please try again.';
@@ -159,25 +139,6 @@ input::placeholder {
   
 input:focus {
     outline: none;
-}
-  
-.options {
-    display: flex;
-    align-items: center;
-    margin-top: 15px;
-    font-size: 12px;
-    color: white;
-}
-  
-.options input {
-    margin-right: 5px;
-    margin-top: 0px;
-}
-  
-.options a {
-    text-decoration: none;
-    color: white;
-    margin-left: auto;
 }
   
 button {
