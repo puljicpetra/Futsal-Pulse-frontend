@@ -26,7 +26,7 @@
           </div>
           <div class="form-group">
             <label for="venue">Venue / Sports Hall</label>
-            <input type="text" id="venue" v-model="tournament.location.venue" placeholder="e.g., Dom Sportova Mate Parlov" />
+            <input type="text" id="venue" v-model="tournament.location.venue" placeholder="e.g., Dom sportova Mate Parlov" />
           </div>
         </div>
 
@@ -39,6 +39,18 @@
               <label for="endDate">End Date (optional)</label>
               <input type="date" id="endDate" v-model="tournament.endDate" />
             </div>
+        </div>
+
+        <div class="form-group">
+          <label for="surface">Playing Surface</label>
+          <select id="surface" v-model="tournament.surface" required>
+            <option disabled value="">Select a surface</option>
+            <option value="parket">Parquet (indoor)</option>
+            <option value="beton">Concrete / Asphalt</option>
+            <option value="trava">Artificial Grass</option>
+            <option value="pijesak">Sand</option>
+            <option value="tepih">Carpet</option>
+          </select>
         </div>
 
         <div class="form-group">
@@ -64,20 +76,11 @@
 import { ref } from 'vue';
 import apiClient from '@/services/api';
 import { useRouter } from 'vue-router';
-
 const router = useRouter();
-const tournament = ref({
-  name: '',
-  location: { city: '', venue: '' },
-  startDate: '',
-  endDate: '',
-  rules: ''
-});
-
+const tournament = ref({ name: '', location: { city: '', venue: '' }, startDate: '', endDate: '', rules: '', surface: '' });
 const isSubmitting = ref(false);
 const error = ref('');
 const success = ref('');
-
 const submitTournament = async () => {
   isSubmitting.value = true;
   error.value = '';
@@ -85,9 +88,7 @@ const submitTournament = async () => {
   try {
     const response = await apiClient.post('/api/tournaments', tournament.value);
     success.value = response.data.message;
-    setTimeout(() => {
-      router.push(`/tournaments`);
-    }, 1500);
+    setTimeout(() => { router.push(`/tournaments`); }, 1500);
   } catch (err) {
     error.value = err.response?.data?.message || 'Failed to create tournament. Please try again.';
     isSubmitting.value = false;
@@ -186,9 +187,10 @@ label {
   font-size: 0.9rem;
 }
 
-input[type="text"],
-input[type="date"],
-textarea {
+.form-card input[type="text"],
+.form-card input[type="date"],
+.form-card select,
+.form-card textarea {
   width: 100%;
   padding: 0.9rem;
   border: 1px solid #dcdcdc;
@@ -196,26 +198,47 @@ textarea {
   box-sizing: border-box;
   font-size: 1rem;
   transition: border-color 0.3s, box-shadow 0.3s;
-  background-color: #f9fafb;
-  color: #333;
+  background-color: #ffffff;
+  color: #1f2937;
 }
-input::placeholder,
-textarea::placeholder {
-  color: #aaa;
+.form-card input::placeholder,
+.form-card textarea::placeholder {
+  color: #9ca3af;
 }
 
-input[type="text"]:focus,
-input[type="date"]:focus,
-textarea:focus {
+.form-card input[type="text"]:focus,
+.form-card input[type="date"]:focus,
+.form-card select:focus,
+.form-card textarea:focus {
   outline: none;
   border-color: #00AEEF;
   box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.1);
   background-color: #fff;
 }
 
+.form-card select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.7rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
 textarea {
   resize: vertical;
   min-height: 120px;
+}
+
+.form-card input:-webkit-autofill,
+.form-card input:-webkit-autofill:hover, 
+.form-card input:-webkit-autofill:focus, 
+.form-card input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #1f2937 !important;
 }
 
 .form-actions {

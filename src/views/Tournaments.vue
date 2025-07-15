@@ -14,6 +14,33 @@
     </div>
 
     <div class="page-content">
+      
+      <div class="filters-container">
+        <div class="filter-group">
+          <label for="city-filter"><i class="fas fa-city"></i> Filter by City</label>
+          <input type="text" id="city-filter" v-model="filters.city" @keyup.enter="applyFilters" placeholder="e.g., Zagreb" />
+        </div>
+        <div class="filter-group">
+          <label for="surface-filter"><i class="fas fa-layer-group"></i> Filter by Surface</label>
+          <select id="surface-filter" v-model="filters.surface" @change="applyFilters">
+            <option value="">All Surfaces</option>
+            <option value="parket">Parquet</option>
+            <option value="beton">Concrete</option>
+            <option value="trava">Grass</option>
+            <option value="pijesak">Sand</option>
+            <option value="tepih">Carpet</option>
+          </select>
+        </div>
+        <div class="filter-actions">
+          <button @click="applyFilters" class="btn-filter">
+            <i class="fas fa-search"></i> Apply
+          </button>
+          <button @click="clearFilters" class="btn-clear">
+            Clear
+          </button>
+        </div>
+      </div>
+
       <div v-if="isLoading" class="loading-state">
         <div class="spinner"></div>
         <p>Loading tournaments...</p>
@@ -29,6 +56,7 @@
         <div v-for="tournament in tournaments" :key="tournament._id" class="tournament-card">
           <div class="card-header">
             <h3>{{ tournament.name }}</h3>
+            <span class="surface-badge" :class="`surface-${tournament.surface}`">{{ tournament.surface }}</span>
           </div>
           <div class="card-body">
             <div class="card-info">
@@ -43,12 +71,10 @@
       </div>
       
       <div v-else class="empty-state">
-        <div class="empty-state-icon"><i class="fas fa-trophy"></i></div>
+        <div class="empty-state-icon"><i class="fas fa-filter"></i></div>
         <h2>No Tournaments Found</h2>
-        <p>There are currently no active or upcoming tournaments.</p>
-        <p v-if="authStore.userRole === 'organizer'">
-          Be the first to <router-link to="/tournaments/create" class="create-link">create one</router-link>!
-        </p>
+        <p>There are no tournaments matching your current filters. Try clearing them.</p>
+        <button @click="clearFilters" class="btn-clear-main">Clear Filters</button>
       </div>
     </div>
   </div>
@@ -58,15 +84,29 @@
 import { ref, onMounted } from 'vue';
 import apiClient from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
+
 const authStore = useAuthStore();
 const tournaments = ref([]);
 const isLoading = ref(true);
 const error = ref('');
+
+const filters = ref({
+  city: '',
+  surface: ''
+});
+
 const fetchTournaments = async () => {
   isLoading.value = true;
   error.value = '';
   try {
-    const response = await apiClient.get('/api/tournaments');
+    const params = new URLSearchParams();
+    if (filters.value.city) {
+      params.append('city', filters.value.city.trim());
+    }
+    if (filters.value.surface) {
+      params.append('surface', filters.value.surface);
+    }
+    const response = await apiClient.get(`/api/tournaments?${params.toString()}`);
     tournaments.value = response.data;
   } catch (err) {
     error.value = err.response?.data?.message || 'Failed to fetch tournaments.';
@@ -74,11 +114,23 @@ const fetchTournaments = async () => {
     isLoading.value = false;
   }
 };
+
+const applyFilters = () => {
+  fetchTournaments();
+};
+
+const clearFilters = () => {
+  filters.value.city = '';
+  filters.value.surface = '';
+  fetchTournaments();
+};
+
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
   return new Date(dateString).toLocaleDateString('en-US', options);
 };
+
 onMounted(() => {
   fetchTournaments();
 });
@@ -86,8 +138,15 @@ onMounted(() => {
 
 <style scoped>
 .tournaments-page {
-  padding: 0; 
+  padding: 0;
   background-color: #f9fafb;
+  min-height: calc(100vh - 60px);
+}
+
+.page-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
 }
 
 .header-container {
@@ -104,12 +163,6 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.page-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
 }
 
 h1 {
@@ -131,57 +184,98 @@ h1 {
   align-items: center;
   gap: 0.5rem;
 }
+
 .btn-create:hover {
   background-color: #008fbf;
   box-shadow: 0 4px 15px rgba(0, 174, 239, 0.2);
   transform: translateY(-2px);
 }
 
-.loading-state, .error-state, .empty-state {
-  text-align: center;
-  padding: 4rem 1rem;
-  color: #6b7280;
-}
-
-.spinner {
-  border: 4px solid #f3f4f6;
-  border-top: 4px solid #00AEEF;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
-}
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.error-state h2, .empty-state h2 {
-  color: #1f2937;
-  margin: 1rem 0 0.5rem;
-}
-
-.empty-state {
-  margin-top: 2rem;
-  background-color: #fff;
-  border: 1px solid #e5e7eb;
+.filters-container {
+  background-color: white;
+  padding: 1.5rem;
   border-radius: 12px;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
-.empty-state-icon {
-  font-size: 3rem;
-  color: #d1d5db;
-  margin-bottom: 1rem;
+.filter-group {
+  flex: 1;
+  min-width: 200px;
 }
 
-.empty-state .create-link {
+.filter-group label {
   font-weight: 600;
-  color: #00AEEF;
-  text-decoration: none;
+  color: #374151;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  display: block;
 }
-.empty-state .create-link:hover {
-  text-decoration: underline;
+
+.filter-group label i {
+  margin-right: 0.5rem;
+  color: #9ca3af;
+}
+
+.filter-group input, 
+.filter-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 1rem;
+  /* ISPRAVAK BOJE TEKSTA I POZADINE */
+  background-color: #ffffff;
+  color: #1f2937;
+}
+
+.filter-group select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-filter, 
+.btn-clear {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-filter {
+  background-color: #374151;
+  color: white;
+}
+
+.btn-filter:hover {
+  background-color: #1f2937;
+}
+
+.btn-clear {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.btn-clear:hover {
+  background-color: #d1d5db;
 }
 
 .tournaments-grid {
@@ -199,6 +293,7 @@ h1 {
   flex-direction: column;
   transition: transform 0.3s, box-shadow 0.3s;
 }
+
 .tournament-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 25px rgba(0,0,0,0.1);
@@ -208,7 +303,11 @@ h1 {
   background-color: #374151;
   color: white;
   padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
+
 .card-header h3 {
   margin: 0;
   font-size: 1.25rem;
@@ -229,11 +328,13 @@ h1 {
   flex-grow: 1;
   margin-bottom: 1.5rem;
 }
+
 .card-info p {
   margin: 0.5rem 0;
   display: flex;
   align-items: center;
 }
+
 .card-info i {
   margin-right: 0.75rem;
   color: #00AEEF;
@@ -252,8 +353,82 @@ h1 {
   transition: background-color 0.3s;
   margin-top: auto;
 }
+
 .btn-details:hover {
   background-color: #111827;
+}
+
+.surface-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  text-transform: capitalize;
+  margin-left: 0.5rem;
+}
+
+.surface-parket { background-color: #fef3c7; color: #92400e; }
+.surface-beton { background-color: #e5e7eb; color: #1f2937; }
+.surface-trava { background-color: #d1fae5; color: #065f46; }
+.surface-pijesak { background-color: #fed7aa; color: #9a3412; }
+.surface-tepih { background-color: #fbcfe8; color: #9d174d; }
+
+.loading-state, 
+.error-state, 
+.empty-state {
+  text-align: center;
+  padding: 4rem 1rem;
+  color: #6b7280;
+}
+
+.error-state h2, 
+.empty-state h2 {
+  color: #1f2937;
+  margin: 1rem 0 0.5rem;
+}
+
+.empty-state {
+  margin-top: 2rem;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  color: #d1d5db;
+  margin-bottom: 1rem;
+}
+
+.empty-state .create-link, 
+.btn-clear-main {
+  font-weight: 600;
+  color: #00AEEF;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.empty-state .create-link:hover, 
+.btn-clear-main:hover {
+  text-decoration: underline;
+}
+
+.spinner {
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #00AEEF;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .btn-retry {
@@ -266,6 +441,7 @@ h1 {
   border: none;
   cursor: pointer;
 }
+
 .btn-retry:hover {
   background-color: #d1d5db;
 }
