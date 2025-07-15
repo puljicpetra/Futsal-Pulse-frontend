@@ -1,0 +1,294 @@
+<template>
+  <div class="create-tournament-container">
+    <div class="form-card">
+      
+      <router-link to="/tournaments" class="back-link">
+        <i class="fas fa-arrow-left"></i> Back to Tournaments
+      </router-link>
+
+      <div class="form-header">
+        <i class="fas fa-trophy"></i>
+        <h2>Create a New Tournament</h2>
+        <p>Fill out the details below to get your tournament up and running.</p>
+      </div>
+      
+      <form @submit.prevent="submitTournament">
+        
+        <div class="form-group">
+          <label for="name">Tournament Name</label>
+          <input type="text" id="name" v-model="tournament.name" placeholder="e.g., Moja ulica, moja ekipa" required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="city">City</label>
+            <input type="text" id="city" v-model="tournament.location.city" placeholder="e.g., Pula" required />
+          </div>
+          <div class="form-group">
+            <label for="venue">Venue / Sports Hall</label>
+            <input type="text" id="venue" v-model="tournament.location.venue" placeholder="e.g., Dom Sportova Mate Parlov" />
+          </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+              <label for="startDate">Start Date</label>
+              <input type="date" id="startDate" v-model="tournament.startDate" required />
+            </div>
+            <div class="form-group">
+              <label for="endDate">End Date (optional)</label>
+              <input type="date" id="endDate" v-model="tournament.endDate" />
+            </div>
+        </div>
+
+        <div class="form-group">
+          <label for="rules">Rules & Description</label>
+          <textarea id="rules" v-model="tournament.rules" rows="6" placeholder="Describe the tournament format, rules, prizes..."></textarea>
+        </div>
+        
+        <div class="form-actions">
+            <p v-if="error" class="error-message">{{ error }}</p>
+            <p v-if="success" class="success-message">{{ success }}</p>
+
+            <button type="submit" class="btn-submit" :disabled="isSubmitting">
+              <span v-if="isSubmitting" class="spinner-sm"></span>
+              {{ isSubmitting ? 'Creating...' : 'Create Tournament' }}
+            </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import apiClient from '@/services/api';
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
+const tournament = ref({
+  name: '',
+  location: { city: '', venue: '' },
+  startDate: '',
+  endDate: '',
+  rules: ''
+});
+
+const isSubmitting = ref(false);
+const error = ref('');
+const success = ref('');
+
+const submitTournament = async () => {
+  isSubmitting.value = true;
+  error.value = '';
+  success.value = '';
+  try {
+    const response = await apiClient.post('/api/tournaments', tournament.value);
+    success.value = response.data.message;
+    setTimeout(() => {
+      router.push(`/tournaments`);
+    }, 1500);
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Failed to create tournament. Please try again.';
+    isSubmitting.value = false;
+  }
+};
+</script>
+
+<style scoped>
+.create-tournament-container {
+  padding: 2rem 1rem;
+  background-color: #f4f7f6;
+  min-height: calc(100vh - 60px);
+  flex-grow: 1;
+}
+
+.form-card {
+  position: relative;
+  width: 100%;
+  max-width: 750px;
+  background: white;
+  padding: 2.5rem 3rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  margin: 2rem auto;
+}
+
+.back-link {
+  position: absolute;
+  top: 25px;
+  left: 25px;
+  text-decoration: none;
+  color: #555;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color 0.3s;
+}
+.back-link:hover {
+  color: #00AEEF;
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.form-header .fa-trophy {
+  font-size: 2.5rem;
+  color: #00AEEF;
+  background: #eef9ff;
+  border-radius: 50%;
+  padding: 1rem;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+}
+.form-header p {
+  color: #666;
+  max-width: 80%;
+  margin-top: 0.25rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.form-row {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+input[type="text"],
+input[type="date"],
+textarea {
+  width: 100%;
+  padding: 0.9rem;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  box-sizing: border-box;
+  font-size: 1rem;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  background-color: #f9fafb;
+  color: #333;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #aaa;
+}
+
+input[type="text"]:focus,
+input[type="date"]:focus,
+textarea:focus {
+  outline: none;
+  border-color: #00AEEF;
+  box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.1);
+  background-color: #fff;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.form-actions {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 1rem;
+  background-color: #00AEEF;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background-color: #008fbf;
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(0, 174, 239, 0.2);
+}
+
+.btn-submit:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+}
+
+.error-message, .success-message {
+  margin-bottom: 1rem;
+  padding: 0.8rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.error-message {
+  color: #721c24;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+}
+.success-message {
+  color: #155724;
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+}
+
+.spinner-sm {
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid #fff;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  .form-card {
+    padding: 2rem 1.5rem;
+  }
+}
+</style>

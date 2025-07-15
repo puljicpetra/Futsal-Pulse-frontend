@@ -15,7 +15,6 @@ const formattedUserRole = computed(() => {
   }
   return 'N/A';
 });
-
 </script>
 
 <template>
@@ -93,24 +92,25 @@ const formattedUserRole = computed(() => {
       </nav>
     </div>
 
-    <router-view />
+    <router-view class="main-content" />
+    
   </div>
 </template>
 
 <style scoped>
-#app {
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
-  position: relative;
-}
 
 nav.navbar {
   position: relative;
   overflow: visible;
   padding: 0;
   height: 60px;
+  flex-shrink: 0; 
+}
+
+.main-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .navbar-logo {

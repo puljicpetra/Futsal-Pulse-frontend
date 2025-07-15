@@ -3,6 +3,8 @@ import Home from '@/views/Home.vue';
 import Login from '@/views/Login.vue';
 import Register from '@/views/Register.vue';
 import Tournaments from '@/views/Tournaments.vue';
+import CreateTournament from '@/views/CreateTournament.vue';
+import TournamentDetail from '@/views/TournamentDetail.vue';
 import Matches from '@/views/Matches.vue';
 import Teams from '@/views/Teams.vue';
 import UserProfile from '@/views/UserProfile.vue';
@@ -28,6 +30,18 @@ const routes = [
     path: '/tournaments',
     name: 'Tournaments',
     component: Tournaments,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/tournaments/create',
+    name: 'CreateTournament',
+    component: CreateTournament,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/tournaments/:id',
+    name: 'TournamentDetail',
+    component: TournamentDetail,
     meta: { requiresAuth: true }
   },
   {
