@@ -32,7 +32,9 @@
             <option value="fan">Fan</option>
           </select>
 
-          <button type="submit">Register</button>
+          <button type="submit" :disabled="isRegistering">
+            {{ isRegistering ? 'Registering...' : 'Register' }}
+          </button>
 
           <p>
             Already have an account?
@@ -49,7 +51,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import axios from 'axios';
+import apiClient from '@/services/api';
 import { useRouter } from 'vue-router';
 
 const username = ref('');
@@ -58,19 +60,24 @@ const password = ref('');
 const role = ref('');
 const error = ref('');
 const success = ref('');
+const isRegistering = ref(false);
 const router = useRouter();
 
 async function register() {
+  if (isRegistering.value) return;
+
+  isRegistering.value = true;
   error.value = '';
   success.value = '';
 
   if (!role.value) {
     error.value = 'Please select a role.';
+    isRegistering.value = false;
     return;
   }
 
   try {
-    const response = await axios.post('http://localhost:3001/register', {
+    const response = await apiClient.post('/register', {
       username: username.value,
       email: email.value,
       password: password.value,
@@ -85,25 +92,20 @@ async function register() {
   } catch (err) {
     if (err.response) {
       console.error("Backend error response data:", err.response.data);
-      console.error("Backend error response status:", err.response.status);
-
-      if (err.response.data && err.response.data.errors && Array.isArray(err.response.data.errors)) {
+      if (err.response.data?.errors?.length) {
         error.value = err.response.data.errors.map(e => e.msg).join(' ');
-      } else if (err.response.data && typeof err.response.data === 'string') {
-        error.value = err.response.data;
-      } else if (err.response.data && err.response.data.message) {
+      } else if (err.response.data?.message) {
          error.value = err.response.data.message;
-      }
-       else {
-        error.value = 'An unknown error occurred during registration. Please try again.';
+      } else {
+        error.value = 'An unknown error occurred during registration.';
       }
     } else if (err.request) {
-      console.error("No response received:", err.request);
-      error.value = 'No response from the server. Please check your network connection.';
+      error.value = 'No response from the server. Please check your connection.';
     } else {
-      console.error('Error setting up request:', err.message);
       error.value = 'Error in request setup: ' + err.message;
     }
+  } finally {
+    isRegistering.value = false;
   }
 }
 </script>
@@ -208,6 +210,12 @@ button:hover {
   background: transparent;
   color: white;
   outline: 1px solid #fff;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  color: #666;
 }
 
 p {

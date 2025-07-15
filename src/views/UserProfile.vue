@@ -25,8 +25,6 @@
         <div class="profile-field">
           <strong>Contact Phone:</strong> {{ user.contact_phone || 'Not set' }}
         </div>
-        <!-- Placeholder for profile -->
-        <!-- <img v-if="user.profile_image_url" :src="user.profile_image_url" alt="Profile Image" class="profile-image"/> -->
         <button @click="enableEditMode" class="btn btn-primary mt-3">Edit Profile</button>
       </div>
 
@@ -43,14 +41,7 @@
           <label for="contactPhone">Contact Phone:</label>
           <input type="tel" id="contactPhone" v-model="editableUser.contact_phone" class="form-control" />
         </div>
-        <!-- Placeholder for profile image URL input -->
-        <!--
-        <div class="form-group mb-3">
-          <label for="profileImageUrl">Profile Image URL:</label>
-          <input type="url" id="profileImageUrl" v-model="editableUser.profile_image_url" class="form-control" />
-        </div>
-        -->
-
+        
         <div class="form-actions">
           <button type="submit" :disabled="isSaving" class="btn btn-success me-2">
             {{ isSaving ? 'Saving...' : 'Save Changes' }}
@@ -66,10 +57,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import axios from 'axios';
-import { useRouter } from 'vue-router';
-
-const router = useRouter();
+import apiClient from '@/services/api';
 
 const user = ref(null);
 const editableUser = ref({});
@@ -87,44 +75,20 @@ const formattedRole = computed(() => {
   return '';
 });
 
-const getAuthToken = () => {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    fetchError.value = 'Authentication token not found. Please log in.';
-    router.push('/login');
-    return null;
-  }
-  return token;
-};
 
 const fetchUserProfile = async () => {
   isLoading.value = true;
   fetchError.value = '';
-  const token = getAuthToken();
-  if (!token) {
-    isLoading.value = false;
-    return;
-  }
-
+  
   try {
-    const response = await axios.get('http://localhost:3001/api/users/me', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await apiClient.get('/api/users/me');
     user.value = response.data;
-    editableUser.value = { ...response.data };
   } catch (err) {
     console.error('Failed to fetch user profile:', err);
-    if (err.response) {
-      if (err.response.status === 401) {
-        fetchError.value = err.response.data.message || 'Unauthorized. Please log in again.';
-        localStorage.removeItem('token');
-        localStorage.removeItem('userRole');
-        router.push('/login');
-      } else {
-        fetchError.value = err.response.data.message || 'Failed to load profile data.';
-      }
-    } else {
-      fetchError.value = 'An error occurred while fetching profile data. Please try again later.';
+    if (err.response && err.response.status !== 401) {
+      fetchError.value = err.response.data.message || 'Failed to load profile data.';
+    } else if (!err.response) {
+      fetchError.value = 'An error occurred. Please check your connection.';
     }
   } finally {
     isLoading.value = false;
@@ -133,7 +97,7 @@ const fetchUserProfile = async () => {
 
 const enableEditMode = () => {
   isEditing.value = true;
-  editableUser.value = { ...user.value };
+  editableUser.value = { ...user.value }; 
   saveError.value = '';
   saveSuccess.value = '';
 };
@@ -148,28 +112,21 @@ const saveProfile = async () => {
   isSaving.value = true;
   saveError.value = '';
   saveSuccess.value = '';
-  const token = getAuthToken();
-  if (!token) {
-    isSaving.value = false;
-    return;
-  }
-
+  
   try {
     const dataToUpdate = {
       full_name: editableUser.value.full_name,
       bio: editableUser.value.bio,
       contact_phone: editableUser.value.contact_phone,
-      // profile_image_url: editableUser.value.profile_image_url,
     };
 
-    const response = await axios.put('http://localhost:3001/api/users/me', dataToUpdate, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await apiClient.put('/api/users/me', dataToUpdate);
+
     user.value = response.data;
-    editableUser.value = { ...response.data };
     isEditing.value = false;
     saveSuccess.value = 'Profile updated successfully!';
     setTimeout(() => saveSuccess.value = '', 3000);
+
   } catch (err) {
     console.error('Failed to save profile:', err);
     if (err.response && err.response.data) {

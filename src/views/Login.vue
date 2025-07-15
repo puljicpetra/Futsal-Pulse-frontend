@@ -1,53 +1,55 @@
 <template>
-    <div class="login-wrapper">
-      <div class="glass-container">
-        <div class="login-box">
-          <h2>Login</h2>
-          <form @submit.prevent="login">
-            <input
-              type="text"
-              v-model="username"
-              placeholder="Username"
-              required
-            />
-  
-            <input
-              type="password"
-              v-model="password"
-              placeholder="Password"
-              required
-            />
-  
-            <div class="options">
-              <input type="checkbox" id="remember" v-model="remember" />
-              <label for="remember">Remember me</label>
-              <a href="#">Forgot Password?</a>
-            </div>
-  
-            <button type="submit">Login</button>
-  
-            <p>
-              Don't have an account?
-              <router-link id="register" to="/register">Register</router-link>
-            </p>
-  
-            <p v-if="error" class="error-message">{{ error }}</p>
-          </form>
-        </div>
+  <div class="login-wrapper">
+    <div class="glass-container">
+      <div class="login-box">
+        <h2>Login</h2>
+        <form @submit.prevent="login">
+          <input
+            type="text"
+            v-model="username"
+            placeholder="Username"
+            required
+          />
+
+          <input
+            type="password"
+            v-model="password"
+            placeholder="Password"
+            required
+          />
+
+          <div class="options">
+            <input type="checkbox" id="remember" v-model="remember" />
+            <label for="remember">Remember me</label>
+            <a href="#">Forgot Password?</a>
+          </div>
+
+          <button type="submit" :disabled="isLoggingIn">
+            {{ isLoggingIn ? 'Logging in...' : 'Login' }}
+          </button>
+
+          <p>
+            Don't have an account?
+            <router-link id="register" to="/register">Register</router-link>
+          </p>
+
+          <p v-if="error" class="error-message">{{ error }}</p>
+        </form>
       </div>
     </div>
+  </div>
 </template>
-  
+
 <script setup>
 import { ref, onMounted } from 'vue';
-import axios from 'axios';
-import { useRouter } from 'vue-router';
-  
+import { useAuthStore } from '@/stores/auth';
+
+const authStore = useAuthStore();
 const username = ref('');
 const password = ref('');
 const remember = ref(false);
 const error = ref('');
-const router = useRouter();
+const isLoggingIn = ref(false);
 
 onMounted(() => {
   const savedUsername = localStorage.getItem('savedUsername');
@@ -58,32 +60,31 @@ onMounted(() => {
 });
 
 async function login() {
-    try {
-      const res = await axios.post('http://localhost:3001/login', {
-        username: username.value,
-        password: password.value,
-      });
-  
-      localStorage.setItem('token', res.data.jwt_token);
-      localStorage.setItem('userRole', res.data.role);
+  if (isLoggingIn.value) return;
 
-      if (remember.value) {
-        localStorage.setItem('savedUsername', username.value);
-      } else {
-        localStorage.removeItem('savedUsername');
-      }
+  isLoggingIn.value = true;
+  error.value = '';
 
-      router.push('/');
-    } catch (err) {
-      error.value = 'Invalid login credentials';
-      localStorage.removeItem('userRole');
+  try {
+    await authStore.login(username.value, password.value);
+
+    if (remember.value) {
+      localStorage.setItem('savedUsername', username.value);
+    } else {
+      localStorage.removeItem('savedUsername');
     }
+
+  } catch (err) {
+    error.value = 'Invalid login credentials. Please try again.';
+  } finally {
+    isLoggingIn.value = false;
+  }
 }
 </script>
-  
+
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Poppins&display=swap');
-  
+
 * {
     margin: 0;
     box-sizing: border-box;
@@ -194,6 +195,11 @@ button:hover {
     color: white;
     outline: 1px solid #fff;
 }
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
   
 p {
     font-size: 12px;
@@ -214,4 +220,3 @@ p {
     font-weight: bold;
 }
 </style>
-  

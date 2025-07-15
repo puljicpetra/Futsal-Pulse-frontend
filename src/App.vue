@@ -1,53 +1,17 @@
 <script setup>
-import { useRoute, useRouter } from 'vue-router';
-import { computed, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import { computed } from 'vue';
+import { useAuthStore } from '@/stores/auth';
 
+const authStore = useAuthStore();
 const route = useRoute();
-const router = useRouter();
 
 const authPages = ['/login', '/register'];
 const isAuthPage = computed(() => authPages.includes(route.path));
 
-const token = ref(localStorage.getItem('token'));
-const userRole = ref(localStorage.getItem('userRole'));
-const username = ref(localStorage.getItem('username'));
-
-const isLoggedIn = computed(() => !!token.value);
-
-const logout = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('userRole');
-  localStorage.removeItem('username');
-  token.value = null;
-  userRole.value = null;
-  username.value = null;
-  router.push('/login');
-};
-
-const updateAuthDataFromStorage = () => {
-  const storedToken = localStorage.getItem('token');
-  token.value = storedToken;
-
-  if (storedToken) {
-    userRole.value = localStorage.getItem('userRole');
-    username.value = localStorage.getItem('username');
-  } else {
-    userRole.value = null;
-    username.value = null;
-  }
-};
-
-watch(
-  () => route.path,
-  () => {
-    updateAuthDataFromStorage();
-  },
-  { immediate: true }
-);
-
 const formattedUserRole = computed(() => {
-  if (userRole.value) {
-    return userRole.value.charAt(0).toUpperCase() + userRole.value.slice(1);
+  if (authStore.userRole) {
+    return authStore.userRole.charAt(0).toUpperCase() + authStore.userRole.slice(1);
   }
   return 'N/A';
 });
@@ -56,7 +20,7 @@ const formattedUserRole = computed(() => {
 
 <template>
   <div id="app">
-    <div v-if="!isAuthPage && isLoggedIn">
+    <div v-if="!isAuthPage && authStore.isLoggedIn">
       <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
           <router-link class="navbar-brand" to="/">
@@ -92,7 +56,7 @@ const formattedUserRole = computed(() => {
                 <router-link to="/teams" class="nav-link">Teams</router-link>
               </li>
             </ul>
-            <div class="d-flex align-items-center ms-auto" v-if="isLoggedIn">
+            <div class="d-flex align-items-center ms-auto" v-if="authStore.isLoggedIn">
               <div class="nav-item dropdown">
                 <a
                   class="nav-link dropdown-toggle user-dropdown-toggle"
@@ -117,7 +81,7 @@ const formattedUserRole = computed(() => {
                   </li>
                   <li><hr class="dropdown-divider" /></li>
                   <li>
-                    <button class="dropdown-item logout-button-dropdown" @click="logout">
+                    <button class="dropdown-item logout-button-dropdown" @click="authStore.logout">
                       <i class="fas fa-sign-out-alt me-2"></i>Logout
                     </button>
                   </li>
