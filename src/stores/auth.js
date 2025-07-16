@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
+import apiClient from '@/services/api';
 
 export const useAuthStore = defineStore('auth', () => {
     const token = ref(localStorage.getItem('token'));
@@ -19,7 +19,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     async function login(username, password) {
         try {
-            const res = await axios.post('http://localhost:3001/login', { username, password });
+            const res = await apiClient.post('/auth/login', { username, password });
+            
             setAuthData(res.data.jwt_token, res.data.role);
             router.push('/');
         } catch (error) {
