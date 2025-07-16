@@ -28,13 +28,20 @@
           <span v-if="tournament.endDate"><i class="fas fa-flag-checkered"></i> Ends: {{ formatDate(tournament.endDate) }}</span>
         </div>
 
-        <div class="organizer-actions" v-if="isOwner">
-            <button @click="goToEdit" class="btn btn-edit">
-                <i class="fas fa-edit"></i> Edit Tournament
-            </button>
-            <button @click="confirmDelete" class="btn btn-delete">
-                <i class="fas fa-trash-alt"></i> Delete Tournament
-            </button>
+        <div class="actions-container">
+            <div class="organizer-actions" v-if="isOwner">
+                <button @click="goToEdit" class="btn btn-edit">
+                    <i class="fas fa-edit"></i> Edit Tournament
+                </button>
+                <button @click="confirmDelete" class="btn btn-delete">
+                    <i class="fas fa-trash-alt"></i> Delete Tournament
+                </button>
+            </div>
+            <div class="player-actions" v-if="authStore.userRole === 'player'">
+                <button @click="openRegisterModal" class="btn btn-register-team">
+                    <i class="fas fa-user-plus"></i> Register Your Team
+                </button>
+            </div>
         </div>
 
       </header>
@@ -48,8 +55,16 @@
           </section>
 
           <section class="teams-section card">
-            <h2><i class="fas fa-users"></i> Registered Teams</h2>
-            <p class="text-muted">Team registration functionality is coming soon.</p>
+            <h2><i class="fas fa-users"></i> Registered Teams ({{ teams.length }})</h2>
+            <div v-if="isLoadingTeams" class="loading-state-small">Loading teams...</div>
+            <ul v-else-if="teams.length > 0" class="teams-list">
+              <li v-for="team in teams" :key="team._id" class="team-item">
+                <i class="fas fa-shield-alt"></i>
+                <span>{{ team.name }}</span>
+                <span class="captain-info">(Captain: {{ team.captain.username }})</span>
+              </li>
+            </ul>
+            <p v-else class="text-muted">No teams have registered for this tournament yet.</p>
           </section>
         </div>
         
@@ -60,6 +75,25 @@
            </section>
         </aside>
       </main>
+    </div>
+
+    <div v-if="showRegisterModal" class="modal-overlay" @click.self="closeRegisterModal">
+        <div class="modal-content">
+            <h3>Register a Team for "{{ tournament.name }}"</h3>
+            <form @submit.prevent="registerTeam">
+                <div class="form-group">
+                    <label for="teamName">Team Name</label>
+                    <input type="text" id="teamName" v-model="newTeamName" required placeholder="Enter your team name">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" @click="closeRegisterModal" class="btn btn-cancel">Cancel</button>
+                    <button type="submit" :disabled="isRegisteringTeam" class="btn-submit">
+                        {{ isRegisteringTeam ? 'Registering...' : 'Submit Registration' }}
+                    </button>
+                </div>
+                <p v-if="modalError" class="error-message">{{ modalError }}</p>
+            </form>
+        </div>
     </div>
   </div>
 </template>
@@ -75,8 +109,15 @@ const router = useRouter();
 const authStore = useAuthStore();
 
 const tournament = ref(null);
+const teams = ref([]);
 const isLoading = ref(true);
+const isLoadingTeams = ref(false);
 const error = ref('');
+
+const showRegisterModal = ref(false);
+const newTeamName = ref('');
+const isRegisteringTeam = ref(false);
+const modalError = ref('');
 
 const isOwner = computed(() => {
   if (!authStore.isLoggedIn || !tournament.value) return false;
@@ -85,7 +126,6 @@ const isOwner = computed(() => {
 
 const fetchTournamentDetails = async () => {
   const tournamentId = route.params.id;
-  
   isLoading.value = true;
   error.value = '';
   try {
@@ -96,6 +136,18 @@ const fetchTournamentDetails = async () => {
     error.value = err.response?.data?.message || 'Failed to fetch tournament details.';
   } finally {
     isLoading.value = false;
+  }
+};
+
+const fetchTeams = async () => {
+  isLoadingTeams.value = true;
+  try {
+    const response = await apiClient.get(`/api/teams?tournamentId=${route.params.id}`);
+    teams.value = response.data;
+  } catch(err) {
+    console.error("Failed to fetch teams:", err);
+  } finally {
+    isLoadingTeams.value = false;
   }
 };
 
@@ -122,8 +174,38 @@ const confirmDelete = async () => {
   }
 };
 
-onMounted(() => {
-  fetchTournamentDetails();
+const openRegisterModal = () => {
+  showRegisterModal.value = true;
+  modalError.value = '';
+  newTeamName.value = '';
+};
+
+const closeRegisterModal = () => {
+  showRegisterModal.value = false;
+};
+
+const registerTeam = async () => {
+  isRegisteringTeam.value = true;
+  modalError.value = '';
+  try {
+    await apiClient.post('/api/teams', {
+      name: newTeamName.value,
+      tournamentId: tournament.value._id
+    });
+    closeRegisterModal();
+    fetchTeams(); 
+  } catch (err) {
+    modalError.value = err.response?.data?.message || "Failed to register team.";
+  } finally {
+    isRegisteringTeam.value = false;
+  }
+};
+
+onMounted(async () => {
+  await fetchTournamentDetails();
+  if (tournament.value) {
+    fetchTeams();
+  }
 });
 </script>
 
@@ -177,11 +259,12 @@ onMounted(() => {
   margin-bottom: 2rem;
 }
 
-.organizer-actions {
+.actions-container {
   margin-top: 1.5rem;
   display: flex;
   justify-content: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .btn {
@@ -213,6 +296,16 @@ onMounted(() => {
 
 .btn-delete:hover {
   background-color: #c82333;
+  transform: translateY(-2px);
+}
+
+.btn-register-team {
+  background-color: #00AEEF;
+  color: white;
+}
+
+.btn-register-team:hover {
+  background-color: #008fbf;
   transform: translateY(-2px);
 }
 
@@ -314,6 +407,122 @@ onMounted(() => {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.teams-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.team-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.team-item:last-child {
+  border-bottom: none;
+}
+
+.team-item:hover {
+  background-color: #f9f9f9;
+}
+
+.team-item .fa-shield-alt {
+  color: #00AEEF;
+  margin-right: 1rem;
+}
+
+.team-item span {
+  font-weight: 500;
+  color: #333;
+}
+
+.captain-info {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+}
+
+.modal-content .form-group {
+  margin-top: 1.5rem;
+}
+
+.modal-content label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.btn-cancel,
+.btn-submit {
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-cancel {
+  padding: 0.7rem 1.2rem;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  color: #333;
+}
+
+.btn-submit {
+  padding: 0.7rem 1.2rem;
+  background-color: #28a745;
+  color: white;
+  border: none;
+}
+
+.modal-content .error-message {
+  color: #dc3545;
+  margin-top: 1rem;
+  text-align: center;
 }
 
 @media (max-width: 992px) {
