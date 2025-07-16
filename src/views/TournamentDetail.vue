@@ -59,12 +59,24 @@
             <div v-if="isLoadingTeams" class="loading-state-small">Loading teams...</div>
             <ul v-else-if="registrations.length > 0" class="teams-list">
               <li v-for="reg in registrations" :key="reg._id" class="team-item">
-                <i class="fas fa-shield-alt"></i>
-                <div class="team-info">
-                  <span class="team-name">{{ reg.team.name }}</span>
-                  <span class="captain-info">Captain: {{ reg.captain.fullName || reg.captain.username }}</span>
+                <div class="team-item-main">
+                    <i class="fas fa-shield-alt"></i>
+                    <div class="team-info">
+                      <span class="team-name">{{ reg.team.name }}</span>
+                      <span class="captain-info">Captain: {{ reg.captain.fullName || reg.captain.username }}</span>
+                    </div>
                 </div>
-                <span class="status-badge" :class="`status-${reg.status}`">{{ reg.status }}</span>
+                <div class="team-item-actions">
+                    <span class="status-badge" :class="`status-${reg.status}`">{{ reg.status }}</span>
+                    <div v-if="isOwner && reg.status === 'pending'" class="organizer-team-actions">
+                        <button @click="updateRegistrationStatus(reg._id, 'approved')" class="btn-sm btn-approve" title="Approve Team">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button @click="updateRegistrationStatus(reg._id, 'rejected')" class="btn-sm btn-reject" title="Reject Team">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
               </li>
             </ul>
             <p v-else class="text-muted">No teams have registered for this tournament yet.</p>
@@ -98,7 +110,7 @@
                     </p>
                 </div>
                 <div class="modal-actions">
-                    <button type="button" @click="closeRegisterModal" class="btn btn-cancel">Cancel</button>
+                    <button type="button" @click="closeRegisterModal" class="btn-cancel">Cancel</button>
                     <button type="submit" :disabled="isRegisteringTeam || !selectedTeamId" class="btn-submit">
                         {{ isRegisteringTeam ? 'Registering...' : 'Submit Registration' }}
                     </button>
@@ -231,6 +243,16 @@ const submitRegistration = async () => {
   }
 };
 
+const updateRegistrationStatus = async (registrationId, newStatus) => {
+    try {
+        await apiClient.patch(`/api/registrations/${registrationId}`, { status: newStatus });
+        fetchRegistrations();
+    } catch (err) {
+        console.error("Failed to update registration status:", err);
+        alert(err.response?.data?.message || "Could not update status.");
+    }
+};
+
 onMounted(async () => {
   await fetchTournamentDetails();
   if (tournament.value) {
@@ -300,7 +322,7 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
-.btn {
+.btn-edit, .btn-delete, .btn-register-team {
   padding: 0.6rem 1.2rem;
   border: none;
   border-radius: 8px;
@@ -450,8 +472,9 @@ onMounted(async () => {
 
 .team-item {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 0;
+  padding: 0.75rem 0.5rem;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -459,9 +482,14 @@ onMounted(async () => {
   border-bottom: none;
 }
 
+.team-item-main {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .team-item .fa-shield-alt {
   color: #00AEEF;
-  margin-right: 1rem;
   font-size: 1.2rem;
 }
 
@@ -480,8 +508,48 @@ onMounted(async () => {
   color: #888;
 }
 
+.team-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.organizer-team-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-sm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-approve {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.btn-approve:hover {
+  background-color: #c3e6cb;
+}
+
+.btn-reject {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.btn-reject:hover {
+  background-color: #f5c6cb;
+}
+
 .status-badge {
-  margin-left: auto;
   font-size: 0.8rem;
   font-weight: 700;
   padding: 0.25rem 0.6rem;
