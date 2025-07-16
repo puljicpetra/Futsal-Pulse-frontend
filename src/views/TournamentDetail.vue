@@ -12,6 +12,14 @@
     </div>
 
     <div v-else-if="tournament" class="tournament-content">
+      
+      <div class="navigation-container">
+        <router-link to="/tournaments" class="back-link">
+          <i class="fas fa-chevron-left"></i>
+          <span>Back to All Tournaments</span>
+        </router-link>
+      </div>
+
       <header class="tournament-header">
         <h1>{{ tournament.name }}</h1>
         <div class="header-meta">
@@ -19,6 +27,16 @@
           <span><i class="fas fa-calendar-alt"></i> Starts: {{ formatDate(tournament.startDate) }}</span>
           <span v-if="tournament.endDate"><i class="fas fa-flag-checkered"></i> Ends: {{ formatDate(tournament.endDate) }}</span>
         </div>
+
+        <div class="organizer-actions" v-if="isOwner">
+            <button @click="goToEdit" class="btn btn-edit">
+                <i class="fas fa-edit"></i> Edit Tournament
+            </button>
+            <button @click="confirmDelete" class="btn btn-delete">
+                <i class="fas fa-trash-alt"></i> Delete Tournament
+            </button>
+        </div>
+
       </header>
 
       <main class="tournament-body">
@@ -47,14 +65,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, onMounted, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/services/api';
+import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
+const router = useRouter();
+const authStore = useAuthStore();
+
 const tournament = ref(null);
 const isLoading = ref(true);
 const error = ref('');
+
+const isOwner = computed(() => {
+  if (!authStore.isLoggedIn || !tournament.value) return false;
+  return authStore.userId === tournament.value.organizer;
+});
 
 const fetchTournamentDetails = async () => {
   const tournamentId = route.params.id;
@@ -78,6 +105,23 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('en-US', options);
 };
 
+const goToEdit = () => {
+  router.push(`/tournaments/${tournament.value._id}/edit`);
+};
+
+const confirmDelete = async () => {
+  if (window.confirm('Are you sure you want to permanently delete this tournament? This action cannot be undone.')) {
+    try {
+      await apiClient.delete(`/api/tournaments/${tournament.value._id}`);
+      alert('Tournament deleted successfully.');
+      router.push('/tournaments');
+    } catch (err) {
+      console.error('Failed to delete tournament:', err);
+      error.value = err.response?.data?.message || 'Failed to delete tournament.';
+    }
+  }
+};
+
 onMounted(() => {
   fetchTournamentDetails();
 });
@@ -95,11 +139,81 @@ onMounted(() => {
   margin: 0 auto;
 }
 
+.navigation-container {
+  margin-bottom: 1.5rem;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: #555;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  background-color: #f0f0f0;
+  transition: all 0.2s ease-in-out;
+}
+
+.back-link i {
+  transition: transform 0.2s ease-in-out;
+}
+
+.back-link:hover {
+  background-color: #e0e0e0;
+  color: #111;
+}
+
+.back-link:hover i {
+  transform: translateX(-3px);
+}
+
 .tournament-header {
+  position: relative;
   text-align: center;
   padding-bottom: 2rem;
   border-bottom: 1px solid #e0e0e0;
   margin-bottom: 2rem;
+}
+
+.organizer-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.btn {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-edit {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.btn-edit:hover {
+  background-color: #e0a800;
+  transform: translateY(-2px);
+}
+
+.btn-delete {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-delete:hover {
+  background-color: #c82333;
+  transform: translateY(-2px);
 }
 
 .tournament-header h1 {

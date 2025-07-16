@@ -8,6 +8,7 @@ import TournamentDetail from '@/views/TournamentDetail.vue';
 import Matches from '@/views/Matches.vue';
 import Teams from '@/views/Teams.vue';
 import UserProfile from '@/views/UserProfile.vue';
+import EditTournament from '@/views/EditTournament.vue';
 
 const routes = [
   {
@@ -42,6 +43,12 @@ const routes = [
     path: '/tournaments/:id',
     name: 'TournamentDetail',
     component: TournamentDetail,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/tournaments/:id/edit',
+    name: 'EditTournament',
+    component: EditTournament,
     meta: { requiresAuth: true }
   },
   {
