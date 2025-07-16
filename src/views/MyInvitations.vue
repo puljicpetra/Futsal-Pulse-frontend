@@ -28,31 +28,31 @@
                 <i class="fas fa-shield-alt team-icon"></i>
                 <div class="team-name-container">
                     <p>Invitation to join the team:</p>
-                    <span class="team-name">{{ invitation.teamName }}</span>
+                    <span class="team-name">{{ invitation.data.team.name }}</span>
                 </div>
             </div>
 
             <div class="card-body">
-                <div class="captain-info">
+                <div v-if="invitation.data.captain" class="captain-info">
                     <strong>Invited by (Captain):</strong>
-                    <span>{{ invitation.captain.fullName || invitation.captain.username }}</span>
-                    <span class="username-muted">(@{{ invitation.captain.username }})</span>
+                    <span>{{ invitation.data.captain.full_name || invitation.data.captain.username }}</span>
+                    <span class="username-muted">(@{{ invitation.data.captain.username }})</span>
                 </div>
-                <div class="players-info">
-                    <strong>Current Roster ({{ invitation.players.length }} players):</strong>
+                <div v-if="invitation.data.team && invitation.data.team.players" class="players-info">
+                    <strong>Current Roster ({{ invitation.data.team.players.length }} players):</strong>
                     <div class="players-tags">
-                        <span v-for="player in invitation.players" :key="player.username" class="player-tag">
-                            {{ player.username }}
+                        <span v-for="player in invitation.data.team.players" :key="player._id" class="player-tag">
+                            {{ player.full_name || player.username }}
                         </span>
                     </div>
                 </div>
             </div>
 
             <div class="invitation-actions">
-              <button @click="respondToInvitation(invitation._id, 'accepted')" :disabled="respondingId === invitation._id" class="btn-accept">
+              <button @click="respondToInvitation(invitation, 'accepted')" :disabled="respondingId === invitation._id" class="btn-accept">
                 <i class="fas fa-check"></i> Accept
               </button>
-              <button @click="respondToInvitation(invitation._id, 'rejected')" :disabled="respondingId === invitation._id" class="btn-reject">
+              <button @click="respondToInvitation(invitation, 'rejected')" :disabled="respondingId === invitation._id" class="btn-reject">
                 <i class="fas fa-times"></i> Reject
               </button>
             </div>
@@ -73,9 +73,12 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import apiClient from '@/services/api';
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
-const invitations = ref([]);
+const authStore = useAuthStore();
+
+const invitations = ref([]); 
 const isLoading = ref(true);
 const error = ref('');
 const respondingId = ref(null);
@@ -85,41 +88,41 @@ const fetchInvitations = async () => {
   isLoading.value = true;
   error.value = '';
   try {
-    const response = await apiClient.get('/api/invitations');
-    invitations.value = response.data;
+    const response = await apiClient.get('/api/notifications');
+    invitations.value = response.data.filter(n => 
+        n.type === 'team_invitation' && 
+        n.data && 
+        n.data.team
+    );
   } catch (err) {
-    error.value = err.response?.data?.message || 'Failed to fetch your invitations.';
+    console.error("Error fetching notifications:", err);
+    error.value = 'Failed to fetch invitations.';
   } finally {
     isLoading.value = false;
   }
 };
 
-const respondToInvitation = async (invitationId, response) => {
-  respondingId.value = invitationId;
+const respondToInvitation = async (invitation, response) => {
+  respondingId.value = invitation._id;
   feedback.value = { type: '', text: '' };
   try {
-    const result = await apiClient.post(`/api/invitations/${invitationId}/respond`, { response });
+    const result = await apiClient.post(`/api/invitations/${invitation._id}/respond`, { response });
     feedback.value = { type: 'success', text: result.data.message };
 
-    invitations.value = invitations.value.filter(inv => inv._id !== invitationId);
-    
+    invitations.value = invitations.value.filter(inv => inv._id !== invitation._id);
+
+    authStore.fetchAllNotifications();
+
     if (response === 'accepted') {
       setTimeout(() => {
         router.push('/teams');
       }, 2000);
     }
-
   } catch (err) {
     feedback.value = { type: 'error', text: err.response?.data?.message || 'Failed to respond to invitation.' };
   } finally {
     respondingId.value = null;
   }
-};
-
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A';
-  const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-  return new Date(dateString).toLocaleDateString('en-US', options);
 };
 
 onMounted(() => {

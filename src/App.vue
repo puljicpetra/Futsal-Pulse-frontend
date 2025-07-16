@@ -2,6 +2,7 @@
 import { useRoute } from 'vue-router';
 import { computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
+import NotificationBell from '@/components/NotificationBell.vue';
 
 const authStore = useAuthStore();
 const route = useRoute();
@@ -56,6 +57,9 @@ const formattedUserRole = computed(() => {
               </li>
             </ul>
             <div class="d-flex align-items-center ms-auto" v-if="authStore.isLoggedIn">
+              
+              <NotificationBell />
+
               <div class="nav-item dropdown">
                 <a
                   class="nav-link dropdown-toggle user-dropdown-toggle"
@@ -66,6 +70,7 @@ const formattedUserRole = computed(() => {
                   aria-expanded="false"
                 >
                   My profile
+                  <span v-if="authStore.unreadNotificationsCount > 0" class="notification-badge">{{ authStore.unreadNotificationsCount }}</span>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownUserProfileMenu">
                   <li>
@@ -79,8 +84,11 @@ const formattedUserRole = computed(() => {
                     </router-link>
                   </li>
                   <li v-if="authStore.userRole === 'player'">
-                    <router-link to="/invitations" class="dropdown-item">
-                      <i class="fas fa-envelope me-2"></i>My Invitations
+                    <router-link to="/invitations" class="dropdown-item d-flex justify-content-between">
+                      <div>
+                        <i class="fas fa-envelope me-2"></i>My Invitations
+                      </div>
+                      <span v-if="authStore.unreadNotificationsCount > 0" class="notification-badge-inline">{{ authStore.unreadNotificationsCount }}</span>
                     </router-link>
                   </li>
                   <li><hr class="dropdown-divider" /></li>
@@ -103,7 +111,6 @@ const formattedUserRole = computed(() => {
 </template>
 
 <style scoped>
-
 nav.navbar {
   position: relative;
   overflow: visible;
@@ -152,6 +159,8 @@ nav.navbar {
 .user-dropdown-toggle {
   color: #000;
   font-weight: bold;
+  position: relative;
+  padding-right: 2rem;
 }
 .user-dropdown-toggle:hover {
   color: #FF0133;
@@ -223,5 +232,30 @@ nav.navbar {
 .logout-button:hover {
   background-color: #FF0133;
   color: #fff;
+}
+
+.notification-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background-color: #dc3545;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.notification-badge-inline {
+  background-color: #dc3545;
+  color: white;
+  border-radius: 8px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.8rem;
+  font-weight: bold;
 }
 </style>

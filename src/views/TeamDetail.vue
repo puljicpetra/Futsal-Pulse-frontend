@@ -25,60 +25,88 @@
         <div v-if="isCaptain" class="captain-badge">
           <i class="fas fa-crown"></i> You are the Captain
         </div>
+        <div v-if="removePlayerMessage.text" :class="`feedback-message-global ${removePlayerMessage.type}`">
+          {{ removePlayerMessage.text }}
+        </div>
       </header>
 
-      <main class="team-body">
-        <section class="players-section card">
-          <h2><i class="fas fa-users"></i> Player Roster ({{ team.players.length }})</h2>
-          <ul class="players-list">
-            <li v-for="player in team.players" :key="player" class="player-item">
-              <i class="fas fa-user-circle"></i> {{ player }}
-            </li>
-          </ul>
-        </section>
+      <main class="team-body-grid">
+        <div class="grid-left-column">
+          <section class="players-section card">
+            <h2><i class="fas fa-users"></i> Player Roster ({{ team.players.length }})</h2>
+            <ul class="players-list">
+              <li v-for="player in team.players" :key="player._id" class="player-item">
+                <div class="player-info">
+                   <img v-if="player.profile_image_url" :src="`http://localhost:3001${player.profile_image_url}`" class="avatar-sm" alt="avatar" />
+                   <i v-else class="fas fa-user-circle avatar-placeholder"></i>
+                   <div class="player-name-details">
+                     <span class="player-full-name">{{ player.full_name || player.username }}</span>
+                     <span v-if="player.full_name" class="player-username">@{{ player.username }}</span>
+                   </div>
+                </div>
+                <div class="player-actions">
+                    <i v-if="player._id === team.captain" class="fas fa-crown captain-icon" title="Team Captain"></i>
+                    <button 
+                      v-if="isCaptain && player._id !== team.captain" 
+                      @click="removePlayer(player._id, player.username)"
+                      class="btn-remove-player"
+                      title="Remove player"
+                    >
+                      <i class="fas fa-user-times"></i>
+                    </button>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </div>
 
-        <section v-if="isCaptain" class="invite-section card">
-           <h2><i class="fas fa-user-plus"></i> Invite a Player</h2>
-           
-            <div class="invite-form">
-              <div class="search-form-container">
-                <input 
-                  type="text" 
-                  v-model="searchQuery"
-                  @keyup.enter="searchPlayers"
-                  placeholder="Search by username..." 
-                  class="search-input"
-                />
-                <button @click="searchPlayers" :disabled="isSearching || searchQuery.length < 2" class="btn-search">
-                  <i v-if="!isSearching" class="fas fa-search"></i>
-                  <div v-else class="spinner-sm-dark"></div>
-                </button>
-              </div>
-               <small class="form-text text-muted">Enter at least 2 characters to search.</small>
-            </div>
-
-            <div v-if="inviteMessage.text" :class="`invite-feedback ${inviteMessage.type}`">
-              {{ inviteMessage.text }}
-            </div>
-
-            <div class="search-results">
-              <p v-if="searchError" class="error-text">{{ searchError }}</p>
-              <ul v-if="searchResults.length > 0" class="search-results-list">
-                <li v-for="player in searchResults" :key="player._id" class="search-result-item">
-                  <div class="player-info">
-                    <img v-if="player.profile_image_url" :src="`http://localhost:3001${player.profile_image_url}`" class="avatar-sm" alt="avatar" />
-                    <i v-else class="fas fa-user-circle avatar-placeholder"></i>
-                    <span>{{ player.username }}</span>
-                  </div>
-                  <button @click="invitePlayer(player._id, player.username)" :disabled="invitingPlayerId === player._id" class="btn-invite">
-                     <div v-if="invitingPlayerId === player._id" class="spinner-sm-light"></div>
-                     <span v-else>Invite</span>
+        <div class="grid-right-column" v-if="isCaptain">
+          <section class="invite-section card">
+            <h2><i class="fas fa-user-plus"></i> Invite a Player</h2>
+            
+              <div class="invite-form">
+                <div class="search-form-container">
+                  <input 
+                    type="text" 
+                    v-model="searchQuery"
+                    @keyup.enter="searchPlayers"
+                    placeholder="Search by username or name..." 
+                    class="search-input"
+                  />
+                  <button @click="searchPlayers" :disabled="isSearching || searchQuery.length < 2" class="btn-search">
+                    <i v-if="!isSearching" class="fas fa-search"></i>
+                    <div v-else class="spinner-sm-dark"></div>
                   </button>
-                </li>
-              </ul>
-              <p v-if="!isSearching && searchResults.length === 0 && hasSearched" class="text-muted">No players found matching your search.</p>
-            </div>
-        </section>
+                </div>
+                <small class="form-text text-muted">Enter at least 2 characters to search.</small>
+              </div>
+
+              <div v-if="inviteMessage.text" :class="`invite-feedback ${inviteMessage.type}`">
+                {{ inviteMessage.text }}
+              </div>
+
+              <div class="search-results">
+                <p v-if="searchError" class="error-text">{{ searchError }}</p>
+                <ul v-if="searchResults.length > 0" class="search-results-list">
+                  <li v-for="player in searchResults" :key="player._id" class="search-result-item">
+                    <div class="player-info">
+                      <img v-if="player.profile_image_url" :src="`http://localhost:3001${player.profile_image_url}`" class="avatar-sm" alt="avatar" />
+                      <i v-else class="fas fa-user-circle avatar-placeholder"></i>
+                      <div class="player-name-details">
+                        <span class="player-full-name">{{ player.full_name || player.username }}</span>
+                        <span v-if="player.full_name" class="player-username">@{{ player.username }}</span>
+                      </div>
+                    </div>
+                    <button @click="invitePlayer(player._id, player.username)" :disabled="invitingPlayerId === player._id" class="btn-invite">
+                      <div v-if="invitingPlayerId === player._id" class="spinner-sm-light"></div>
+                      <span v-else>Invite</span>
+                    </button>
+                  </li>
+                </ul>
+                <p v-if="!isSearching && searchResults.length === 0 && hasSearched" class="text-muted">No players found matching your search.</p>
+              </div>
+          </section>
+        </div>
       </main>
 
     </div>
@@ -106,6 +134,8 @@ const hasSearched = ref(false);
 const searchError = ref('');
 const invitingPlayerId = ref(null);
 const inviteMessage = ref({ type: '', text: '' });
+
+const removePlayerMessage = ref({ type: '', text: '' });
 
 const isCaptain = computed(() => {
   if (!authStore.isLoggedIn || !team.value) return false;
@@ -141,8 +171,9 @@ const searchPlayers = async () => {
     const response = await apiClient.get('/api/users/search', {
       params: { query: searchQuery.value }
     });
+    const existingPlayerIds = team.value.players.map(p => p._id);
     searchResults.value = response.data.filter(
-      player => !team.value.players.includes(player.username)
+      player => !existingPlayerIds.includes(player._id)
     );
   } catch (err) {
     searchError.value = err.response?.data?.message || 'Error searching for players.';
@@ -155,7 +186,7 @@ const invitePlayer = async (playerId, playerUsername) => {
   invitingPlayerId.value = playerId;
   inviteMessage.value = { type: '', text: '' };
   try {
-    const response = await apiClient.post(`/api/teams/${teamId}/invites`, {
+    await apiClient.post(`/api/teams/${teamId}/invites`, {
       playerIdToInvite: playerId
     });
     inviteMessage.value = { type: 'success', text: `Successfully invited ${playerUsername}!` };
@@ -168,6 +199,29 @@ const invitePlayer = async (playerId, playerUsername) => {
     invitingPlayerId.value = null;
   }
 };
+
+const removePlayer = async (playerId, playerUsername) => {
+  if (window.confirm(`Are you sure you want to remove ${playerUsername} from the team?`)) {
+    removePlayerMessage.value = { type: '', text: '' };
+    try {
+      await apiClient.delete(`/api/teams/${teamId}/players/${playerId}`);
+      
+      if (team.value) {
+        team.value.players = team.value.players.filter(p => p._id !== playerId);
+      }
+
+      removePlayerMessage.value = { type: 'success', text: `${playerUsername} has been removed.` };
+
+    } catch (err) {
+      removePlayerMessage.value = { type: 'error', text: err.response?.data?.message || 'Failed to remove player.' };
+    } finally {
+        setTimeout(() => {
+            removePlayerMessage.value = { type: '', text: '' };
+        }, 3000);
+    }
+  }
+};
+
 
 onMounted(() => {
   fetchTeamDetails();
@@ -182,7 +236,7 @@ onMounted(() => {
 }
 
 .team-content {
-  max-width: 900px;
+  max-width: 1100px; 
   margin: 0 auto;
 }
 
@@ -240,10 +294,17 @@ onMounted(() => {
   margin-right: 0.4rem;
 }
 
-.team-body {
+.team-body-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 3fr 2fr; 
   gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 992px) {
+  .team-body-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {
@@ -251,6 +312,7 @@ onMounted(() => {
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  height: 100%; 
 }
 
 .card h2 {
@@ -273,24 +335,18 @@ onMounted(() => {
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
 }
 
 .player-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: space-between;
   background-color: #f8f9fa;
   padding: 0.75rem 1rem;
   border-radius: 8px;
-  font-weight: 500;
   color: #343a40;
-}
-
-.player-item .fa-user-circle {
-  color: #6c757d;
-  font-size: 1.2rem;
 }
 
 .loading-state, .error-state {
@@ -321,7 +377,6 @@ onMounted(() => {
   color: #888;
   font-style: italic;
 }
-
 
 .invite-form {
   margin-bottom: 1.5rem;
@@ -362,6 +417,8 @@ onMounted(() => {
   list-style: none;
   padding: 0;
   margin-top: 1rem;
+  max-height: 250px;
+  overflow-y: auto;
 }
 
 .search-result-item {
@@ -380,18 +437,37 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  font-weight: 500;
+}
+
+.player-name-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.player-full-name {
+  font-weight: 600;
+  color: #343a40;
+}
+
+.player-username {
+  font-size: 0.85rem;
+  color: #6c757d;
 }
 
 .avatar-sm {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   object-fit: cover;
 }
 .avatar-placeholder {
-  font-size: 32px;
+  font-size: 40px;
   color: #adb5bd;
+}
+
+.captain-icon {
+  color: #f59e0b;
+  font-size: 1.1rem;
 }
 
 .btn-invite {
@@ -447,4 +523,47 @@ onMounted(() => {
   border-top-color: #fff;
 }
 
+
+.player-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-remove-player {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-remove-player:hover {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.feedback-message-global {
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  margin-top: 1.5rem;
+  font-size: 0.95rem;
+  text-align: center;
+}
+.feedback-message-global.success {
+  background-color: #d4edda;
+  color: #155724;
+}
+.feedback-message-global.error {
+  background-color: #f8d7da;
+  color: #721c24;
+}
 </style>

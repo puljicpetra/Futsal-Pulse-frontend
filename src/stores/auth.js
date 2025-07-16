@@ -7,12 +7,39 @@ import { jwtDecode } from 'jwt-decode';
 export const useAuthStore = defineStore('auth', () => {
     const token = ref(localStorage.getItem('token'));
     const userRole = ref(localStorage.getItem('userRole'));
-    
     const userId = ref(token.value ? jwtDecode(token.value).id : null); 
+    
+    const unreadInvitationCount = ref(0);
+
+    const allNotifications = ref([]);
+    const totalUnreadCount = ref(0);
     
     const router = useRouter();
 
     const isLoggedIn = computed(() => !!token.value);
+
+    async function fetchUnreadInvitationCount() {
+        if (!token.value) return;
+        try {
+            const response = await apiClient.get('/api/notifications/count');
+            unreadInvitationCount.value = response.data.count;
+        } catch (error) {
+            console.error("Failed to fetch invitation count:", error);
+            unreadInvitationCount.value = 0; 
+        }
+    }
+    
+    async function fetchAllNotifications() {
+        if (!token.value) return;
+        try {
+            const response = await apiClient.get('/api/notifications');
+            allNotifications.value = response.data;
+            totalUnreadCount.value = response.data.filter(n => !n.isRead).length;
+            unreadInvitationCount.value = response.data.filter(n => n.type === 'team_invitation' && !n.isRead).length;
+        } catch (error) {
+            console.error("Failed to fetch all notifications:", error);
+        }
+    }
 
     function setAuthData(newToken, newRole) {
         const decodedToken = jwtDecode(newToken);
@@ -23,6 +50,8 @@ export const useAuthStore = defineStore('auth', () => {
         
         localStorage.setItem('token', newToken);
         localStorage.setItem('userRole', newRole);
+        
+        fetchAllNotifications();
     }
 
     async function login(username, password) {
@@ -40,11 +69,30 @@ export const useAuthStore = defineStore('auth', () => {
         token.value = null;
         userRole.value = null;
         userId.value = null;
+        unreadInvitationCount.value = 0;
+        allNotifications.value = [];
+        totalUnreadCount.value = 0;
         
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
         router.push('/login');
     }
 
-    return { token, userRole, userId, isLoggedIn, login, logout }; 
+    if(token.value) {
+        fetchAllNotifications();
+    }
+
+    return { 
+        token, 
+        userRole, 
+        userId, 
+        isLoggedIn, 
+        login, 
+        logout, 
+        unreadInvitationCount,
+        fetchUnreadInvitationCount,
+        allNotifications,
+        totalUnreadCount,
+        fetchAllNotifications
+    }; 
 });

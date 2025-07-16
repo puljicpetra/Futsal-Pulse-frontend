@@ -37,7 +37,12 @@
               </p>
             </div>
             <router-link :to="`/teams/${team._id}`" class="btn-details">
-              Manage Team
+              <span v-if="team.captain === authStore.userId">
+                <i class="fas fa-cog"></i> Manage Team
+              </span>
+              <span v-else>
+                <i class="fas fa-eye"></i> View Details
+              </span>
             </router-link>
           </div>
         </div>
@@ -201,6 +206,10 @@ h1 {
   text-decoration: none;
   font-weight: 600;
   margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 .btn-details:hover {
   background-color: #1f2937;
