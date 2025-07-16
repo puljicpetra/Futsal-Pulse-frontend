@@ -57,6 +57,17 @@
           <label for="rules">Rules & Description</label>
           <textarea id="rules" v-model="tournament.rules" rows="6" placeholder="Describe the tournament format, rules, prizes..."></textarea>
         </div>
+
+        <div class="form-group">
+          <label for="tournamentImage">Tournament Image (optional)</label>
+          <input 
+            type="file" 
+            id="tournamentImage" 
+            @change="handleFileChange" 
+            class="file-input"
+            accept="image/png, image/jpeg" 
+          />
+        </div>
         
         <div class="form-actions">
             <p v-if="error" class="error-message">{{ error }}</p>
@@ -76,21 +87,63 @@
 import { ref } from 'vue';
 import apiClient from '@/services/api';
 import { useRouter } from 'vue-router';
+
 const router = useRouter();
-const tournament = ref({ name: '', location: { city: '', venue: '' }, startDate: '', endDate: '', rules: '', surface: '' });
+
+const tournament = ref({
+  name: '',
+  location: { city: '', venue: '' },
+  startDate: '',
+  endDate: '',
+  rules: '',
+  surface: ''
+});
+
+const tournamentImageFile = ref(null);
+
 const isSubmitting = ref(false);
 const error = ref('');
 const success = ref('');
+
+const handleFileChange = (event) => {
+  tournamentImageFile.value = event.target.files[0];
+};
+
 const submitTournament = async () => {
   isSubmitting.value = true;
   error.value = '';
   success.value = '';
+
+  const formData = new FormData();
+
+  formData.append('name', tournament.value.name);
+  formData.append('location', JSON.stringify(tournament.value.location));
+  formData.append('startDate', tournament.value.startDate);
+  if (tournament.value.endDate) {
+    formData.append('endDate', tournament.value.endDate);
+  }
+  formData.append('surface', tournament.value.surface);
+  formData.append('rules', tournament.value.rules);
+
+  if (tournamentImageFile.value) {
+    formData.append('tournamentImage', tournamentImageFile.value);
+  }
+
   try {
-    const response = await apiClient.post('/api/tournaments', tournament.value);
+    const response = await apiClient.post('/api/tournaments', formData, {
+      headers: {
+        'Content-Type': undefined
+      }
+    });
+    
     success.value = response.data.message;
-    setTimeout(() => { router.push(`/tournaments`); }, 1500);
+    setTimeout(() => {
+      router.push(`/tournaments/${response.data.tournament._id}`);
+    }, 1500);
+
   } catch (err) {
     error.value = err.response?.data?.message || 'Failed to create tournament. Please try again.';
+  } finally {
     isSubmitting.value = false;
   }
 };
@@ -190,7 +243,8 @@ label {
 .form-card input[type="text"],
 .form-card input[type="date"],
 .form-card select,
-.form-card textarea {
+.form-card textarea,
+.form-card .file-input {
   width: 100%;
   padding: 0.9rem;
   border: 1px solid #dcdcdc;
@@ -201,6 +255,28 @@ label {
   background-color: #ffffff;
   color: #1f2937;
 }
+
+.file-input {
+  padding: 0.5rem;
+  background-color: #f9f9f9;
+}
+
+.file-input::file-selector-button {
+  font-weight: bold;
+  color: #00AEEF;
+  padding: 0.5em 1em;
+  border: 1px solid #00AEEF;
+  border-radius: 6px;
+  background-color: white;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-right: 1rem;
+}
+
+.file-input::file-selector-button:hover {
+  background-color: #eef9ff;
+}
+
 .form-card input::placeholder,
 .form-card textarea::placeholder {
   color: #9ca3af;
@@ -209,7 +285,8 @@ label {
 .form-card input[type="text"]:focus,
 .form-card input[type="date"]:focus,
 .form-card select:focus,
-.form-card textarea:focus {
+.form-card textarea:focus,
+.form-card .file-input:focus {
   outline: none;
   border-color: #00AEEF;
   box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.1);

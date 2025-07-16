@@ -1,7 +1,7 @@
 <template>
   <div class="tournaments-page">
     <div class="header-container">
-      <div class="header">
+      <div class="header-content-wrapper">
         <h1>Tournaments</h1>
         <router-link 
           to="/tournaments/create" 
@@ -54,6 +54,21 @@
 
       <div v-else-if="tournaments.length > 0" class="tournaments-grid">
         <div v-for="tournament in tournaments" :key="tournament._id" class="tournament-card">
+          
+          <router-link :to="`/tournaments/${tournament._id}`" class="card-image-link">
+            <div class="card-image-container">
+              <img 
+                v-if="tournament.imageUrl" 
+                :src="`http://localhost:3001${tournament.imageUrl}`" 
+                alt="Tournament Image" 
+                class="card-image"
+              >
+              <div v-else class="card-image-placeholder">
+                <i class="fas fa-futbol"></i>
+              </div>
+            </div>
+          </router-link>
+          
           <div class="card-header">
             <h3>{{ tournament.name }}</h3>
             <span class="surface-badge" :class="`surface-${tournament.surface}`">{{ tournament.surface }}</span>
@@ -144,8 +159,6 @@ onMounted(() => {
 }
 
 .page-content {
-  max-width: 1200px;
-  margin: 0 auto;
   padding: 2rem;
 }
 
@@ -157,7 +170,7 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
-.header {
+.header-content-wrapper {
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
@@ -195,7 +208,8 @@ h1 {
   background-color: white;
   padding: 1.5rem;
   border-radius: 12px;
-  margin-bottom: 2rem;
+  margin: 0 auto 2rem auto;
+  max-width: 1000px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   display: flex;
   align-items: flex-end;
@@ -229,7 +243,6 @@ h1 {
   border-radius: 8px;
   box-sizing: border-box;
   font-size: 1rem;
-  /* ISPRAVAK BOJE TEKSTA I POZADINE */
   background-color: #ffffff;
   color: #1f2937;
 }
@@ -280,8 +293,25 @@ h1 {
 
 .tournaments-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .tournaments-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .tournaments-grid {
+    grid-template-columns: 1fr;
+  }
+  .header-content-wrapper {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
 }
 
 .tournament-card {
@@ -299,6 +329,36 @@ h1 {
   box-shadow: 0 10px 25px rgba(0,0,0,0.1);
 }
 
+.card-image-link {
+  display: block;
+  text-decoration: none;
+}
+.card-image-container {
+  width: 100%;
+  height: 180px;
+  background-color: #e5e7eb;
+  overflow: hidden;
+  position: relative;
+}
+.card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.tournament-card:hover .card-image {
+  transform: scale(1.05);
+}
+.card-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #9ca3af;
+  font-size: 4rem;
+}
+
 .card-header {
   background-color: #374151;
   color: white;
@@ -306,6 +366,7 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-radius: 0;
 }
 
 .card-header h3 {
