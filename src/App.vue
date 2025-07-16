@@ -78,6 +78,11 @@ const formattedUserRole = computed(() => {
                       <i class="fas fa-edit me-2"></i>Edit my profile
                     </router-link>
                   </li>
+                  <li v-if="authStore.userRole === 'player'">
+                    <router-link to="/invitations" class="dropdown-item">
+                      <i class="fas fa-envelope me-2"></i>My Invitations
+                    </router-link>
+                  </li>
                   <li><hr class="dropdown-divider" /></li>
                   <li>
                     <button class="dropdown-item logout-button-dropdown" @click="authStore.logout">

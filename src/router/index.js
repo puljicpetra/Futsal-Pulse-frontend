@@ -10,6 +10,8 @@ import Teams from '@/views/Teams.vue';
 import UserProfile from '@/views/UserProfile.vue';
 import EditTournament from '@/views/EditTournament.vue';
 import CreateTeam from '@/views/CreateTeam.vue';
+import TeamDetail from '@/views/TeamDetail.vue';
+import MyInvitations from '@/views/MyInvitations.vue';
 
 const routes = [
   {
@@ -70,10 +72,22 @@ const routes = [
     component: CreateTeam,
     meta: { requiresAuth: true }
   },
+  { 
+    path: '/teams/:id',
+    name: 'TeamDetail',
+    component: TeamDetail,
+    meta: { requiresAuth: true }
+  },
   {
     path: '/profile',
     name: 'UserProfile', 
     component: UserProfile, 
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/invitations',
+    name: 'MyInvitations',
+    component: MyInvitations,
     meta: { requiresAuth: true }
   }
 ];
