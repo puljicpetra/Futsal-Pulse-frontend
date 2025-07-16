@@ -37,7 +37,7 @@
                     <i class="fas fa-trash-alt"></i> Delete Tournament
                 </button>
             </div>
-            <div class="player-actions" v-if="authStore.userRole === 'player'">
+            <div class="player-actions" v-if="authStore.userRole === 'player' && !isAlreadyRegistered">
                 <button @click="openRegisterModal" class="btn btn-register-team">
                     <i class="fas fa-user-plus"></i> Register Your Team
                 </button>
@@ -86,7 +86,7 @@
                     <input type="text" id="teamName" v-model="newTeamName" required placeholder="Enter your team name">
                 </div>
                 <div class="modal-actions">
-                    <button type="button" @click="closeRegisterModal" class="btn btn-cancel">Cancel</button>
+                    <button type="button" @click="closeRegisterModal" class="btn-cancel">Cancel</button>
                     <button type="submit" :disabled="isRegisteringTeam" class="btn-submit">
                         {{ isRegisteringTeam ? 'Registering...' : 'Submit Registration' }}
                     </button>
@@ -122,6 +122,11 @@ const modalError = ref('');
 const isOwner = computed(() => {
   if (!authStore.isLoggedIn || !tournament.value) return false;
   return authStore.userId === tournament.value.organizer;
+});
+
+const isAlreadyRegistered = computed(() => {
+    if (!authStore.isLoggedIn || teams.value.length === 0) return false;
+    return teams.value.some(team => team.captain._id === authStore.userId);
 });
 
 const fetchTournamentDetails = async () => {
