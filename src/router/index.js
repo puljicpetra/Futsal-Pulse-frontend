@@ -9,6 +9,7 @@ import Matches from '@/views/Matches.vue';
 import Teams from '@/views/Teams.vue';
 import UserProfile from '@/views/UserProfile.vue';
 import EditTournament from '@/views/EditTournament.vue';
+import CreateTeam from '@/views/CreateTeam.vue';
 
 const routes = [
   {
@@ -61,6 +62,12 @@ const routes = [
     path: '/teams',
     name: 'Teams',
     component: Teams,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/teams/create',
+    name: 'CreateTeam',
+    component: CreateTeam,
     meta: { requiresAuth: true }
   },
   {

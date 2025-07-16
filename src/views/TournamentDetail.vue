@@ -39,7 +39,7 @@
             </div>
             <div class="player-actions" v-if="authStore.userRole === 'player' && !isAlreadyRegistered">
                 <button @click="openRegisterModal" class="btn btn-register-team">
-                    <i class="fas fa-user-plus"></i> Register Your Team
+                    <i class="fas fa-user-plus"></i> Register a Team
                 </button>
             </div>
         </div>
@@ -55,13 +55,16 @@
           </section>
 
           <section class="teams-section card">
-            <h2><i class="fas fa-users"></i> Registered Teams ({{ teams.length }})</h2>
+            <h2><i class="fas fa-users"></i> Registered Teams ({{ registrations.length }})</h2>
             <div v-if="isLoadingTeams" class="loading-state-small">Loading teams...</div>
-            <ul v-else-if="teams.length > 0" class="teams-list">
-              <li v-for="team in teams" :key="team._id" class="team-item">
+            <ul v-else-if="registrations.length > 0" class="teams-list">
+              <li v-for="reg in registrations" :key="reg._id" class="team-item">
                 <i class="fas fa-shield-alt"></i>
-                <span>{{ team.name }}</span>
-                <span class="captain-info">(Captain: {{ team.captain.username }})</span>
+                <div class="team-info">
+                  <span class="team-name">{{ reg.team.name }}</span>
+                  <span class="captain-info">Captain: {{ reg.captain.fullName || reg.captain.username }}</span>
+                </div>
+                <span class="status-badge" :class="`status-${reg.status}`">{{ reg.status }}</span>
               </li>
             </ul>
             <p v-else class="text-muted">No teams have registered for this tournament yet.</p>
@@ -79,15 +82,24 @@
 
     <div v-if="showRegisterModal" class="modal-overlay" @click.self="closeRegisterModal">
         <div class="modal-content">
-            <h3>Register a Team for "{{ tournament.name }}"</h3>
-            <form @submit.prevent="registerTeam">
+            <h3>Register Your Team</h3>
+            <p>Select one of your teams to register for "{{ tournament.name }}".</p>
+            <form @submit.prevent="submitRegistration">
                 <div class="form-group">
-                    <label for="teamName">Team Name</label>
-                    <input type="text" id="teamName" v-model="newTeamName" required placeholder="Enter your team name">
+                    <label for="teamSelect">Your Teams</label>
+                    <select id="teamSelect" v-model="selectedTeamId" required>
+                      <option disabled value="">Select a team...</option>
+                      <option v-for="team in myTeams" :key="team._id" :value="team._id">
+                        {{ team.name }}
+                      </option>
+                    </select>
+                    <p v-if="myTeams.length === 0" class="text-muted small-text">
+                      You don't have any teams. <router-link to="/teams/create">Create one first!</router-link>
+                    </p>
                 </div>
                 <div class="modal-actions">
-                    <button type="button" @click="closeRegisterModal" class="btn-cancel">Cancel</button>
-                    <button type="submit" :disabled="isRegisteringTeam" class="btn-submit">
+                    <button type="button" @click="closeRegisterModal" class="btn btn-cancel">Cancel</button>
+                    <button type="submit" :disabled="isRegisteringTeam || !selectedTeamId" class="btn-submit">
                         {{ isRegisteringTeam ? 'Registering...' : 'Submit Registration' }}
                     </button>
                 </div>
@@ -109,13 +121,14 @@ const router = useRouter();
 const authStore = useAuthStore();
 
 const tournament = ref(null);
-const teams = ref([]);
+const registrations = ref([]);
+const myTeams = ref([]);
 const isLoading = ref(true);
 const isLoadingTeams = ref(false);
 const error = ref('');
 
 const showRegisterModal = ref(false);
-const newTeamName = ref('');
+const selectedTeamId = ref('');
 const isRegisteringTeam = ref(false);
 const modalError = ref('');
 
@@ -125,8 +138,9 @@ const isOwner = computed(() => {
 });
 
 const isAlreadyRegistered = computed(() => {
-    if (!authStore.isLoggedIn || teams.value.length === 0) return false;
-    return teams.value.some(team => team.captain._id === authStore.userId);
+  if (!authStore.isLoggedIn || registrations.value.length === 0 || myTeams.value.length === 0) return false;
+  const myTeamIds = myTeams.value.map(t => t._id);
+  return registrations.value.some(reg => myTeamIds.includes(reg.team._id));
 });
 
 const fetchTournamentDetails = async () => {
@@ -144,15 +158,25 @@ const fetchTournamentDetails = async () => {
   }
 };
 
-const fetchTeams = async () => {
+const fetchRegistrations = async () => {
   isLoadingTeams.value = true;
   try {
-    const response = await apiClient.get(`/api/teams?tournamentId=${route.params.id}`);
-    teams.value = response.data;
+    const response = await apiClient.get(`/api/registrations?tournamentId=${route.params.id}`);
+    registrations.value = response.data;
   } catch(err) {
-    console.error("Failed to fetch teams:", err);
+    console.error("Failed to fetch registrations:", err);
   } finally {
     isLoadingTeams.value = false;
+  }
+};
+
+const fetchMyTeams = async () => {
+  if (authStore.userRole !== 'player') return;
+  try {
+    const response = await apiClient.get('/api/teams');
+    myTeams.value = response.data.filter(team => team.captain === authStore.userId);
+  } catch (err) {
+    console.error("Failed to fetch user's teams:", err);
   }
 };
 
@@ -179,26 +203,27 @@ const confirmDelete = async () => {
   }
 };
 
-const openRegisterModal = () => {
+const openRegisterModal = async () => {
+  await fetchMyTeams();
   showRegisterModal.value = true;
   modalError.value = '';
-  newTeamName.value = '';
+  selectedTeamId.value = '';
 };
 
 const closeRegisterModal = () => {
   showRegisterModal.value = false;
 };
 
-const registerTeam = async () => {
+const submitRegistration = async () => {
   isRegisteringTeam.value = true;
   modalError.value = '';
   try {
-    await apiClient.post('/api/teams', {
-      name: newTeamName.value,
+    await apiClient.post('/api/registrations', {
+      teamId: selectedTeamId.value,
       tournamentId: tournament.value._id
     });
     closeRegisterModal();
-    fetchTeams(); 
+    fetchRegistrations();
   } catch (err) {
     modalError.value = err.response?.data?.message || "Failed to register team.";
   } finally {
@@ -209,7 +234,10 @@ const registerTeam = async () => {
 onMounted(async () => {
   await fetchTournamentDetails();
   if (tournament.value) {
-    fetchTeams();
+    fetchRegistrations();
+    if(authStore.userRole === 'player'){
+      fetchMyTeams();
+    }
   }
 });
 </script>
@@ -423,33 +451,57 @@ onMounted(async () => {
 .team-item {
   display: flex;
   align-items: center;
-  padding: 0.75rem 0.5rem;
+  padding: 0.75rem 0;
   border-bottom: 1px solid #f0f0f0;
-  transition: background-color 0.2s;
 }
 
 .team-item:last-child {
   border-bottom: none;
 }
 
-.team-item:hover {
-  background-color: #f9f9f9;
-}
-
 .team-item .fa-shield-alt {
   color: #00AEEF;
   margin-right: 1rem;
+  font-size: 1.2rem;
 }
 
-.team-item span {
-  font-weight: 500;
+.team-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.team-name {
+  font-weight: 600;
   color: #333;
 }
 
 .captain-info {
-  margin-left: auto;
   font-size: 0.85rem;
   color: #888;
+}
+
+.status-badge {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  text-transform: capitalize;
+}
+
+.status-pending {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-approved {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.status-rejected {
+  background-color: #fee2e2;
+  color: #991b1b;
 }
 
 .modal-overlay {
@@ -478,6 +530,11 @@ onMounted(async () => {
   margin-top: 0;
 }
 
+.modal-content p {
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
 .modal-content .form-group {
   margin-top: 1.5rem;
 }
@@ -488,7 +545,7 @@ onMounted(async () => {
   display: block;
 }
 
-.modal-content input {
+.modal-content select {
   width: 100%;
   padding: 0.8rem;
   border: 1px solid #ccc;
@@ -505,29 +562,47 @@ onMounted(async () => {
 
 .btn-cancel,
 .btn-submit {
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
+  padding: 0.7rem 1.2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
 }
 
 .btn-cancel {
-  padding: 0.7rem 1.2rem;
   background-color: #f0f0f0;
   border: 1px solid #ccc;
   color: #333;
 }
 
 .btn-submit {
-  padding: 0.7rem 1.2rem;
   background-color: #28a745;
   color: white;
-  border: none;
+}
+
+.btn-submit:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
 }
 
 .modal-content .error-message {
   color: #dc3545;
   margin-top: 1rem;
   text-align: center;
+}
+
+.small-text {
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.small-text a {
+  color: #00AEEF;
+  text-decoration: none;
+}
+
+.small-text a:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 992px) {
