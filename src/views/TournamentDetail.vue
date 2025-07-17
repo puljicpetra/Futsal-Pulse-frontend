@@ -101,8 +101,33 @@
         
         <aside class="sidebar-content">
            <section class="schedule-section card">
-            <h2><i class="fas fa-clipboard-list"></i> Match Schedule</h2>
-            <p class="text-muted">Match schedule will be available here.</p>
+            <div class="card-header-flex">
+              <h2><i class="fas fa-clipboard-list"></i> Match Schedule</h2>
+              <button v-if="isOwner" class="btn-add-match" @click="openAddMatchModal">
+                  <i class="fas fa-plus"></i> Add Match
+              </button>
+            </div>
+            <div v-if="matches.length === 0" class="text-muted">
+                No matches scheduled yet.
+            </div>
+            <ul v-else class="matches-list">
+                <li v-for="match in matches" :key="match._id" class="match-item">
+                    <div class="match-info">
+                        <span class="team-name">{{ match.teamA.name || 'TBD' }}</span>
+                        <span class="match-score">
+                            {{ match.score.teamA !== null ? match.score.teamA : '-' }} : {{ match.score.teamB !== null ? match.score.teamB : '-' }}
+                        </span>
+                        <span class="team-name">{{ match.teamB.name || 'TBD' }}</span>
+                    </div>
+                    <div class="match-meta">
+                        <span>{{ formatMatchDate(match.matchDate) }}</span>
+                        <span v-if="match.group" class="group-badge">{{ match.group }}</span>
+                    </div>
+                    <button v-if="isOwner" @click="deleteMatch(match._id)" class="btn-delete-match" title="Delete Match">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </li>
+            </ul>
            </section>
         </aside>
       </main>
@@ -135,6 +160,48 @@
             </form>
         </div>
     </div>
+
+    <div v-if="showAddMatchModal" class="modal-overlay" @click.self="closeAddMatchModal">
+      <div class="modal-content">
+        <h3>Add a New Match</h3>
+        <form @submit.prevent="submitNewMatch">
+          <div class="form-group">
+            <label for="teamA">Team A</label>
+            <select id="teamA" v-model="newMatch.teamA_id" required>
+              <option disabled value="">Select Team A</option>
+              <option v-for="reg in approvedRegistrations" :key="reg.team._id" :value="reg.team._id">
+                {{ reg.team.name }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="teamB">Team B</label>
+            <select id="teamB" v-model="newMatch.teamB_id" required>
+              <option disabled value="">Select Team B</option>
+              <option v-for="reg in approvedRegistrations" :key="reg.team._id" :value="reg.team._id">
+                {{ reg.team.name }}
+              </option>
+            </select>
+          </div>
+           <div class="form-group">
+            <label for="matchDate">Match Date and Time</label>
+            <input type="datetime-local" id="matchDate" v-model="newMatch.matchDate" required />
+          </div>
+          <div class="form-group">
+            <label for="matchGroup">Group / Stage (optional)</label>
+            <input type="text" id="matchGroup" v-model="newMatch.group" placeholder="e.g., Group A, Quarter-final"/>
+          </div>
+          <div class="modal-actions">
+            <button type="button" @click="closeAddMatchModal" class="btn-cancel">Cancel</button>
+            <button type="submit" :disabled="isSubmittingMatch" class="btn-submit">
+              {{ isSubmittingMatch ? 'Adding...' : 'Add Match' }}
+            </button>
+          </div>
+          <p v-if="matchModalError" class="error-message">{{ matchModalError }}</p>
+        </form>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -150,6 +217,7 @@ const authStore = useAuthStore();
 
 const tournament = ref(null);
 const registrations = ref([]);
+const matches = ref([]);
 const myTeams = ref([]);
 const isLoading = ref(true);
 const isLoadingTeams = ref(false);
@@ -161,9 +229,24 @@ const selectedTeamId = ref('');
 const isRegisteringTeam = ref(false);
 const modalError = ref('');
 
+const showAddMatchModal = ref(false);
+const isSubmittingMatch = ref(false);
+const matchModalError = ref('');
+const newMatch = ref({
+    tournamentId: route.params.id,
+    teamA_id: '',
+    teamB_id: '',
+    matchDate: '',
+    group: ''
+});
+
 const isOwner = computed(() => {
   if (!authStore.isLoggedIn || !tournament.value) return false;
   return authStore.userId === tournament.value.organizer;
+});
+
+const approvedRegistrations = computed(() => {
+    return registrations.value.filter(reg => reg.status === 'approved');
 });
 
 const isCaptainOf = (teamId) => {
@@ -208,6 +291,15 @@ const fetchRegistrations = async () => {
   }
 };
 
+const fetchMatches = async () => {
+    try {
+        const response = await apiClient.get(`/api/matches/tournament/${route.params.id}`);
+        matches.value = response.data;
+    } catch(err) {
+        console.error("Failed to fetch matches:", err);
+    }
+};
+
 const fetchMyTeams = async () => {
   if (authStore.userRole !== 'player') return;
   try {
@@ -222,6 +314,12 @@ const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
   return new Date(dateString).toLocaleDateString('en-US', options);
+};
+
+const formatMatchDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+  return new Date(dateString).toLocaleString('en-US', options);
 };
 
 const formatStatus = (status) => {
@@ -300,10 +398,57 @@ const requestTeamWithdrawal = async (registrationId) => {
     }
 };
 
+const openAddMatchModal = () => {
+    showAddMatchModal.value = true;
+    matchModalError.value = '';
+    newMatch.value = {
+        tournamentId: route.params.id,
+        teamA_id: '',
+        teamB_id: '',
+        matchDate: '',
+        group: ''
+    };
+};
+
+const closeAddMatchModal = () => {
+    showAddMatchModal.value = false;
+};
+
+const submitNewMatch = async () => {
+    if (newMatch.value.teamA_id && newMatch.value.teamA_id === newMatch.value.teamB_id) {
+        matchModalError.value = 'A team cannot play against itself.';
+        return;
+    }
+    isSubmittingMatch.value = true;
+    matchModalError.value = '';
+    try {
+        await apiClient.post('/api/matches', newMatch.value);
+        closeAddMatchModal();
+        fetchMatches();
+    } catch(err) {
+        matchModalError.value = err.response?.data?.message || 'Failed to create match.';
+    } finally {
+        isSubmittingMatch.value = false;
+    }
+};
+
+const deleteMatch = async (matchId) => {
+    if (window.confirm('Are you sure you want to delete this match?')) {
+        try {
+            await apiClient.delete(`/api/matches/${matchId}`);
+            matches.value = matches.value.filter(m => m._id !== matchId);
+        } catch (err) {
+            console.error("Failed to delete match:", err);
+            feedback.value = { type: 'error', text: err.response?.data?.message || 'Could not delete match.' };
+        }
+    }
+};
+
 onMounted(async () => {
   await fetchTournamentDetails();
   if (tournament.value) {
     fetchRegistrations();
+    fetchMatches();
     if(authStore.userRole === 'player'){
       fetchMyTeams();
     }
@@ -441,6 +586,13 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .tournament-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {
@@ -454,11 +606,35 @@ onMounted(async () => {
   font-size: 1.5rem;
   color: #333;
   margin-top: 0;
-  margin-bottom: 1.5rem;
   border-bottom: 1px solid #eee;
   padding-bottom: 0.75rem;
   display: flex;
   align-items: center;
+}
+
+.card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+.card-header-flex h2 {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.btn-add-match {
+    background-color: #198754;
+    color: white;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .card h2 i {
@@ -678,7 +854,7 @@ onMounted(async () => {
   display: block;
 }
 
-.modal-content select {
+.modal-content select, .modal-content input {
   width: 100%;
   padding: 0.8rem;
   border: 1px solid #ccc;
@@ -738,12 +914,6 @@ onMounted(async () => {
   text-decoration: underline;
 }
 
-@media (max-width: 992px) {
-  .tournament-body {
-    grid-template-columns: 1fr;
-  }
-}
-
 .feedback-message {
   padding: 0.75rem 1.25rem;
   border-radius: 8px;
@@ -759,5 +929,69 @@ onMounted(async () => {
 .feedback-message.error {
   background-color: #f8d7da;
   color: #721c24;
+}
+
+.matches-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.match-item {
+    position: relative;
+    padding: 1rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+.match-item:last-child {
+    border-bottom: none;
+}
+.match-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+}
+.match-info .team-name {
+    flex: 1;
+    text-align: center;
+}
+.match-score {
+    font-size: 1.25rem;
+    padding: 0 1rem;
+}
+.match-meta {
+    font-size: 0.85rem;
+    color: #888;
+    text-align: center;
+    margin-top: 0.5rem;
+}
+.group-badge {
+    display: inline-block;
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+}
+
+.btn-delete-match {
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    line-height: 1;
+    transition: all 0.2s;
+}
+.btn-delete-match:hover {
+    color: #dc3545;
+    background-color: #fee2e2;
 }
 </style>
