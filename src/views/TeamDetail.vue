@@ -33,8 +33,8 @@
       <main class="team-body-grid">
         <div class="grid-left-column">
           <section class="players-section card">
-            <h2><i class="fas fa-users"></i> Player Roster ({{ team.players.length }})</h2>
-            <ul class="players-list">
+            <h2><i class="fas fa-users"></i> Player Roster ({{ team.players.length }}/8)</h2>
+            <ul class="players-list" :class="{ 'two-columns': team.players.length > 4 }">
               <li v-for="player in team.players" :key="player._id" class="player-item">
                 <div class="player-info">
                    <img v-if="player.profile_image_url" :src="`http://localhost:3001${player.profile_image_url}`" class="avatar-sm" alt="avatar" />
@@ -61,7 +61,7 @@
         </div>
 
         <div class="grid-right-column" v-if="isCaptain">
-          <section class="invite-section card">
+          <section v-if="team.players.length < 8" class="invite-section card">
             <h2><i class="fas fa-user-plus"></i> Invite a Player</h2>
             
               <div class="invite-form">
@@ -111,15 +111,26 @@
                 </ul>
                 <p v-if="!isSearching && searchResults.length === 0 && hasSearched" class="text-muted">No players found matching your search.</p>
               </div>
-
-            <div class="danger-zone">
-                <hr>
-                <h4>Danger Zone</h4>
-                <button @click="deleteTeam" class="btn btn-danger">
-                    <i class="fas fa-trash-alt"></i> Disband Team
-                </button>
-            </div>
           </section>
+
+          <section v-else class="invite-section card">
+              <h2><i class="fas fa-user-plus"></i> Invite a Player</h2>
+              <div class="team-full-message">
+                  <i class="fas fa-exclamation-circle"></i>
+                  <p><strong>Your team is full.</strong></p>
+                  <p>The maximum number of players (8) has been reached. You cannot invite more players.</p>
+              </div>
+          </section>
+
+          <div class="danger-zone-wrapper">
+              <div class="danger-zone">
+                  <h4>Danger Zone</h4>
+                  <button @click="deleteTeam" class="btn btn-danger">
+                      <i class="fas fa-trash-alt"></i> Disband Team
+                  </button>
+              </div>
+          </div>
+
         </div>
       </main>
 
@@ -381,6 +392,12 @@ onMounted(() => {
   gap: 0.75rem;
 }
 
+.players-list.two-columns {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+
 .player-item {
   display: flex;
   align-items: center;
@@ -613,6 +630,10 @@ onMounted(() => {
   color: #721c24;
 }
 
+.danger-zone-wrapper {
+    margin-top: auto;
+}
+
 .danger-zone {
     margin-top: 2rem;
     padding-top: 1.5rem;
@@ -637,5 +658,17 @@ onMounted(() => {
 }
 .btn-danger:hover {
     background-color: #c82333;
+}
+
+.team-full-message {
+    text-align: center;
+    padding: 2rem 1rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+.team-full-message .fa-exclamation-circle {
+    font-size: 2rem;
+    color: #00AEEF;
+    margin-bottom: 1rem;
 }
 </style>
