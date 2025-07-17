@@ -180,6 +180,7 @@ const submitTournament = async () => {
   gap: 0.5rem;
   transition: color 0.3s;
 }
+
 .back-link:hover {
   color: #00AEEF;
 }

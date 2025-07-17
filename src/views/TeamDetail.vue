@@ -105,6 +105,14 @@
                 </ul>
                 <p v-if="!isSearching && searchResults.length === 0 && hasSearched" class="text-muted">No players found matching your search.</p>
               </div>
+
+            <div class="danger-zone">
+                <hr>
+                <h4>Danger Zone</h4>
+                <button @click="deleteTeam" class="btn btn-danger">
+                    <i class="fas fa-trash-alt"></i> Disband Team
+                </button>
+            </div>
           </section>
         </div>
       </main>
@@ -115,11 +123,12 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
+const router = useRouter();
 const authStore = useAuthStore();
 
 const team = ref(null);
@@ -221,6 +230,22 @@ const removePlayer = async (playerId, playerUsername) => {
     }
   }
 };
+
+const deleteTeam = async () => {
+    const teamName = team.value.name;
+    if (window.confirm(`Are you sure you want to permanently delete the team "${teamName}"? This action cannot be undone.`)) {
+        try {
+            await apiClient.delete(`/api/teams/${teamId}`);
+            alert(`Team "${teamName}" has been deleted.`);
+            router.push('/teams');
+        } catch(err) {
+             removePlayerMessage.value = { type: 'error', text: err.response?.data?.message || 'Failed to delete the team.' };
+             setTimeout(() => {
+                removePlayerMessage.value = { type: '', text: '' };
+            }, 4000);
+        }
+    }
+}
 
 
 onMounted(() => {
@@ -523,7 +548,6 @@ onMounted(() => {
   border-top-color: #fff;
 }
 
-
 .player-actions {
   display: flex;
   align-items: center;
@@ -565,5 +589,31 @@ onMounted(() => {
 .feedback-message-global.error {
   background-color: #f8d7da;
   color: #721c24;
+}
+
+.danger-zone {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid #fee2e2;
+}
+
+.danger-zone h4 {
+    color: #b91c1c;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+    width: 100%;
+    border: none;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-danger:hover {
+    background-color: #c82333;
 }
 </style>
