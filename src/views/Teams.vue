@@ -4,6 +4,7 @@
       <div class="header-content-wrapper">
         <h1>My Teams</h1>
         <router-link 
+          v-if="authStore.userRole === 'player'"
           to="/teams/create" 
           class="btn-create"
         >
@@ -48,6 +49,11 @@
         </div>
       </div>
       
+      <div v-else-if="authStore.userRole !== 'player'" class="empty-state">
+        <div class="empty-state-icon"><i class="fas fa-users"></i></div>
+        <h2>Team management is for players only.</h2>
+      </div>
+
       <div v-else class="empty-state">
         <div class="empty-state-icon"><i class="fas fa-users"></i></div>
         <h2>You're Not on a Team Yet</h2>
@@ -84,7 +90,11 @@ const fetchMyTeams = async () => {
 };
 
 onMounted(() => {
-  fetchMyTeams();
+  if (authStore.userRole === 'player') {
+    fetchMyTeams();
+  } else {
+    isLoading.value = false;
+  }
 });
 </script>
 

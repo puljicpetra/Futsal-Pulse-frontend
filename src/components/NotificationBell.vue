@@ -12,13 +12,22 @@
       <span v-if="authStore.totalUnreadCount > 0" class="notification-count-bell">{{ authStore.totalUnreadCount }}</span>
     </button>
     <ul class="dropdown-menu dropdown-menu-end notification-dropdown-menu" aria-labelledby="notificationDropdown">
-      <li class="dropdown-header">
-        Notifications
+      <li class="dropdown-header d-flex justify-content-between align-items-center">
+        <span>Notifications</span>
+        <button 
+            v-if="authStore.allNotifications.length > 0" 
+            @click.stop="clearAllNotifications" 
+            class="btn-clear-all"
+        >
+            Clear All
+        </button>
       </li>
+
       <li v-if="authStore.allNotifications.length === 0">
         <span class="dropdown-item text-muted">No notifications yet.</span>
       </li>
-      <li v-for="notif in authStore.allNotifications" :key="notif._id">
+      
+      <li v-for="notif in authStore.allNotifications" :key="notif._id" class="notification-item-wrapper">
         <router-link :to="getNotificationLink(notif)" class="dropdown-item notification-item" :class="{ 'is-unread': !notif.isRead }">
           <div class="notification-icon">
             <i :class="getNotificationIcon(notif.type)"></i>
@@ -28,6 +37,9 @@
             <small class="text-muted">{{ timeAgo(notif.createdAt) }}</small>
           </div>
         </router-link>
+        <button @click.stop="deleteNotification(notif._id)" class="btn-delete-single" title="Dismiss">
+            <i class="fas fa-times"></i>
+        </button>
       </li>
     </ul>
   </div>
@@ -45,16 +57,29 @@ const getNotificationIcon = (type) => {
       return 'fas fa-user-plus text-primary';
     case 'team_removal':
       return 'fas fa-user-times text-danger';
+    case 'new_registration':
+      return 'fas fa-clipboard-check text-success';
+    case 'withdrawal_request':
+      return 'fas fa-flag text-warning';
+    case 'withdrawal_approved':
+      return 'fas fa-flag-checkered text-info';
+    case 'registration_update':
+      return 'fas fa-info-circle text-info';
+    case 'team_deleted':
+       return 'fas fa-trash-alt text-danger';
     default:
-      return 'fas fa-info-circle text-secondary';
+      return 'fas fa-bell text-secondary';
   }
 };
 
 const getNotificationLink = (notification) => {
+    if (notification.link && notification.link !== '#') {
+        return notification.link;
+    }
     if (notification.type === 'team_invitation') {
         return '/invitations';
     }
-    return notification.link || '#';
+    return '#';
 };
 
 const timeAgo = (dateString) => {
@@ -87,6 +112,28 @@ const markAllAsRead = async () => {
         authStore.fetchAllNotifications();
     } catch (err) {
         console.error("Failed to mark all notifications as read", err);
+    }
+};
+
+const deleteNotification = async (notificationId) => {
+    try {
+        await apiClient.delete(`/api/notifications/${notificationId}`);
+        authStore.allNotifications = authStore.allNotifications.filter(n => n._id !== notificationId);
+        authStore.totalUnreadCount = authStore.allNotifications.filter(n => !n.isRead).length;
+    } catch (err) {
+        console.error("Failed to delete notification:", err);
+    }
+};
+
+const clearAllNotifications = async () => {
+    if (window.confirm("Are you sure you want to clear all notifications?")) {
+        try {
+            await apiClient.delete('/api/notifications');
+            authStore.allNotifications = [];
+            authStore.totalUnreadCount = 0;
+        } catch (err) {
+            console.error("Failed to clear all notifications:", err);
+        }
     }
 };
 </script>
@@ -137,7 +184,53 @@ const markAllAsRead = async () => {
   position: sticky;
   top: 0;
   z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
+
+.btn-clear-all {
+    background: none;
+    border: none;
+    color: #007bff;
+    font-size: 0.8rem;
+    font-weight: normal;
+    cursor: pointer;
+    padding: 0;
+}
+.btn-clear-all:hover {
+    text-decoration: underline;
+}
+
+.notification-item-wrapper {
+    position: relative;
+    display: block;
+}
+
+.btn-delete-single {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 0.8rem;
+    line-height: 20px;
+    text-align: center;
+    display: none;
+    transition: color 0.2s;
+}
+.notification-item-wrapper:hover .btn-delete-single {
+    display: block;
+}
+.btn-delete-single:hover {
+    color: #333;
+}
+
 
 .notification-item {
   display: flex;
@@ -168,5 +261,8 @@ const markAllAsRead = async () => {
   font-size: 0.9rem;
   font-weight: 500;
   color: #333;
+}
+.notification-content small {
+    font-size: 0.8rem;
 }
 </style>

@@ -52,7 +52,7 @@ const formattedUserRole = computed(() => {
               <li class="nav-item">
                 <router-link to="/matches" class="nav-link">Matches</router-link>
               </li>
-              <li class="nav-item">
+              <li class="nav-item" v-if="authStore.userRole === 'player'">
                 <router-link to="/teams" class="nav-link">Teams</router-link>
               </li>
             </ul>
@@ -70,7 +70,7 @@ const formattedUserRole = computed(() => {
                   aria-expanded="false"
                 >
                   My profile
-                  <span v-if="authStore.unreadNotificationsCount > 0" class="notification-badge">{{ authStore.unreadNotificationsCount }}</span>
+                  <span v-if="authStore.unreadInvitationCount > 0" class="notification-badge">{{ authStore.unreadInvitationCount }}</span>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownUserProfileMenu">
                   <li>
@@ -88,7 +88,7 @@ const formattedUserRole = computed(() => {
                       <div>
                         <i class="fas fa-envelope me-2"></i>My Invitations
                       </div>
-                      <span v-if="authStore.unreadNotificationsCount > 0" class="notification-badge-inline">{{ authStore.unreadNotificationsCount }}</span>
+                      <span v-if="authStore.unreadInvitationCount > 0" class="notification-badge-inline">{{ authStore.unreadInvitationCount }}</span>
                     </router-link>
                   </li>
                   <li><hr class="dropdown-divider" /></li>
