@@ -97,8 +97,14 @@
                         <span v-if="player.full_name" class="player-username">@{{ player.username }}</span>
                       </div>
                     </div>
-                    <button @click="invitePlayer(player._id, player.username)" :disabled="invitingPlayerId === player._id" class="btn-invite">
+                    <button 
+                      @click="invitePlayer(player._id, player.username)" 
+                      :disabled="invitingPlayerId === player._id || player.inviteStatus === 'pending'"
+                      class="btn-invite"
+                      :class="{ 'pending': player.inviteStatus === 'pending' }"
+                    >
                       <div v-if="invitingPlayerId === player._id" class="spinner-sm-light"></div>
+                      <span v-else-if="player.inviteStatus === 'pending'">Pending</span>
                       <span v-else>Invite</span>
                     </button>
                   </li>
@@ -181,9 +187,9 @@ const searchPlayers = async () => {
       params: { query: searchQuery.value }
     });
     const existingPlayerIds = team.value.players.map(p => p._id);
-    searchResults.value = response.data.filter(
-      player => !existingPlayerIds.includes(player._id)
-    );
+    searchResults.value = response.data
+      .filter(player => !existingPlayerIds.includes(player._id))
+      .map(player => ({ ...player, inviteStatus: 'idle' }));
   } catch (err) {
     searchError.value = err.response?.data?.message || 'Error searching for players.';
   } finally {
@@ -199,11 +205,22 @@ const invitePlayer = async (playerId, playerUsername) => {
       playerIdToInvite: playerId
     });
     inviteMessage.value = { type: 'success', text: `Successfully invited ${playerUsername}!` };
-    searchResults.value = [];
-    searchQuery.value = '';
-    hasSearched.value = false;
+    
+    const playerIndex = searchResults.value.findIndex(p => p._id === playerId);
+    if (playerIndex > -1) {
+      searchResults.value.splice(playerIndex, 1);
+    }
+    
   } catch (err) {
-     inviteMessage.value = { type: 'error', text: err.response?.data?.message || 'Failed to send invitation.' };
+    const errorMessage = err.response?.data?.message || 'Failed to send invitation.';
+    inviteMessage.value = { type: 'error', text: errorMessage };
+    
+    if (errorMessage.toLowerCase().includes('already been invited')) {
+      const playerIndex = searchResults.value.findIndex(p => p._id === playerId);
+      if (playerIndex > -1) {
+        searchResults.value[playerIndex].inviteStatus = 'pending';
+      }
+    }
   } finally {
     invitingPlayerId.value = null;
   }
@@ -505,6 +522,11 @@ onMounted(() => {
   cursor: pointer;
   min-width: 80px;
   text-align: center;
+  transition: background-color 0.2s ease-in-out;
+}
+.btn-invite.pending {
+  background-color: #6c757d;
+  cursor: not-allowed;
 }
 .btn-invite:disabled {
   background-color: #9ca3af;
