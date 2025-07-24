@@ -23,7 +23,7 @@
       <header class="tournament-header">
         <h1>{{ tournament.name }}</h1>
         <div class="header-meta">
-          <span><i class="fas fa-map-marker-alt"></i> {{ tournament.location.city }}, {{ tournament.location.venue }}</span>
+          <span v-if="tournament.location.city"><i class="fas fa-map-marker-alt"></i> {{ tournament.location.city }}{{ tournament.location.venue ? `, ${tournament.location.venue}` : '' }}</span>
           <span><i class="fas fa-calendar-alt"></i> Starts: {{ formatDate(tournament.startDate) }}</span>
           <span v-if="tournament.endDate"><i class="fas fa-flag-checkered"></i> Ends: {{ formatDate(tournament.endDate) }}</span>
         </div>
@@ -37,10 +37,16 @@
                     <i class="fas fa-trash-alt"></i> Delete Tournament
                 </button>
             </div>
-            <div class="player-actions" v-if="authStore.userRole === 'player' && !isAlreadyRegistered">
+            <div class="player-actions" v-if="authStore.userRole === 'player' && !userRegistration">
                 <button @click="openRegisterModal" class="btn btn-register-team">
                     <i class="fas fa-user-plus"></i> Register a Team
                 </button>
+            </div>
+            <div class="player-actions" v-if="userRegistration?.status === 'approved'">
+                <p class="feedback-message success small">You are registered for this tournament!</p>
+            </div>
+             <div class="player-actions" v-if="userRegistration?.status === 'pending'">
+                <p class="feedback-message pending small">Your registration is pending approval.</p>
             </div>
         </div>
         <div v-if="feedback.text" :class="`feedback-message ${feedback.type}`">
@@ -56,79 +62,24 @@
             <p v-else class="text-muted">No specific rules have been provided by the organizer.</p>
           </section>
 
-          <section class="teams-section card">
-            <h2><i class="fas fa-users"></i> Registered Teams ({{ registrations.length }})</h2>
-            <div v-if="isLoadingTeams" class="loading-state-small">Loading teams...</div>
-            <ul v-else-if="registrations.length > 0" class="teams-list">
-              <li v-for="reg in registrations" :key="reg._id" class="team-item">
-                <div class="team-item-main">
-                    <i class="fas fa-shield-alt"></i>
-                    <div class="team-info">
-                      <span class="team-name">{{ reg.team.name }}</span>
-                      <span class="captain-info">Captain: {{ reg.captain.fullName || reg.captain.username }}</span>
-                    </div>
-                </div>
-                <div class="team-item-actions">
-                    <span class="status-badge" :class="`status-${reg.status}`">{{ formatStatus(reg.status) }}</span>
-                    
-                    <div v-if="isCaptainOf(reg.team._id)" class="captain-team-actions">
-                        <button v-if="reg.status === 'approved'" @click="requestTeamWithdrawal(reg._id)" class="btn-sm btn-withdraw" title="Request Withdrawal">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </button>
-                    </div>
+          <TeamList 
+            ref="teamListComp"
+            :tournamentId="tournament._id" 
+            :isOwner="isOwner"
+            @feedback="showFeedback"
+            @registrations-loaded="handleRegistrationsLoaded"
+          />
 
-                    <div v-if="isOwner" class="organizer-team-actions">
-                        <div v-if="reg.status === 'pending'">
-                          <button @click="updateRegistrationStatus(reg._id, 'approved')" class="btn-sm btn-approve" title="Approve Team">
-                              <i class="fas fa-check"></i>
-                          </button>
-                          <button @click="updateRegistrationStatus(reg._id, 'rejected')" class="btn-sm btn-reject" title="Reject Team">
-                              <i class="fas fa-times"></i>
-                          </button>
-                        </div>
-                        <div v-if="reg.status === 'pending_withdrawal'">
-                          <button @click="updateRegistrationStatus(reg._id, 'withdrawal_approved')" class="btn-sm btn-approve" title="Approve Withdrawal">
-                              <i class="fas fa-check"></i> Approve
-                          </button>
-                        </div>
-                    </div>
-                </div>
-              </li>
-            </ul>
-            <p v-else class="text-muted">No teams have registered for this tournament yet.</p>
-          </section>
         </div>
         
         <aside class="sidebar-content">
-           <section class="schedule-section card">
-            <div class="card-header-flex">
-              <h2><i class="fas fa-clipboard-list"></i> Match Schedule</h2>
-              <button v-if="isOwner" class="btn-add-match" @click="openAddMatchModal">
-                  <i class="fas fa-plus"></i> Add Match
-              </button>
-            </div>
-            <div v-if="matches.length === 0" class="text-muted">
-                No matches scheduled yet.
-            </div>
-            <ul v-else class="matches-list">
-                <li v-for="match in matches" :key="match._id" class="match-item">
-                    <div class="match-info">
-                        <span class="team-name">{{ match.teamA.name || 'TBD' }}</span>
-                        <span class="match-score">
-                            {{ match.score.teamA !== null ? match.score.teamA : '-' }} : {{ match.score.teamB !== null ? match.score.teamB : '-' }}
-                        </span>
-                        <span class="team-name">{{ match.teamB.name || 'TBD' }}</span>
-                    </div>
-                    <div class="match-meta">
-                        <span>{{ formatMatchDate(match.matchDate) }}</span>
-                        <span v-if="match.group" class="group-badge">{{ match.group }}</span>
-                    </div>
-                    <button v-if="isOwner" @click="deleteMatch(match._id)" class="btn-delete-match" title="Delete Match">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
-                </li>
-            </ul>
-           </section>
+           <MatchList 
+            ref="matchListComp"
+            :tournamentId="tournament._id"
+            :isOwner="isOwner"
+            @add-match="openAddMatchModal"
+            @feedback="showFeedback"
+           />
         </aside>
       </main>
     </div>
@@ -139,14 +90,15 @@
             <p>Select one of your teams to register for "{{ tournament.name }}".</p>
             <form @submit.prevent="submitRegistration">
                 <div class="form-group">
-                    <label for="teamSelect">Your Teams</label>
+                    <label for="teamSelect">Your Teams (Captain)</label>
                     <select id="teamSelect" v-model="selectedTeamId" required>
                       <option disabled value="">Select a team...</option>
                       <option v-for="team in myCaptainTeams" :key="team._id" :value="team._id">
                         {{ team.name }}
                       </option>
                     </select>
-                    <p v-if="myCaptainTeams.length === 0" class="text-muted small-text">
+                    <p v-if="isLoadingMyTeams" class="text-muted small-text">Loading your teams...</p>
+                    <p v-else-if="myCaptainTeams.length === 0" class="text-muted small-text">
                       You are not a captain of any team. <router-link to="/teams/create">Create one first!</router-link>
                     </p>
                 </div>
@@ -210,19 +162,22 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
+import TeamList from '../components/TeamList.vue';
+import MatchList from '../components/MatchList.vue';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
 const tournament = ref(null);
-const registrations = ref([]);
-const matches = ref([]);
-const myTeams = ref([]);
+const approvedRegistrations = ref([]);
 const isLoading = ref(true);
-const isLoadingTeams = ref(false);
 const error = ref('');
 const feedback = ref({ type: '', text: '' });
+
+const myCaptainTeams = ref([]);
+const isLoadingMyTeams = ref(false);
+const userRegistration = ref(null);
 
 const showRegisterModal = ref(false);
 const selectedTeamId = ref('');
@@ -240,122 +195,84 @@ const newMatch = ref({
     group: ''
 });
 
+const teamListComp = ref(null);
+const matchListComp = ref(null);
+
 const isOwner = computed(() => {
   if (!authStore.isLoggedIn || !tournament.value) return false;
   return authStore.userId === tournament.value.organizer;
 });
 
-const approvedRegistrations = computed(() => {
-    return registrations.value.filter(reg => reg.status === 'approved');
-});
-
-const isCaptainOf = (teamId) => {
-    if (authStore.userRole !== 'player') return false;
-    return myTeams.value.some(team => team._id === teamId && team.captain === authStore.userId);
-};
-
-const myCaptainTeams = computed(() => {
-    return myTeams.value.filter(team => team.captain === authStore.userId);
-});
-
-const isAlreadyRegistered = computed(() => {
-  if (!authStore.isLoggedIn || registrations.value.length === 0 || myTeams.value.length === 0) return false;
-  const myTeamIds = myTeams.value.map(t => t._id);
-  return registrations.value.some(reg => myTeamIds.includes(reg.team._id));
-});
-
 const fetchTournamentDetails = async () => {
-  const tournamentId = route.params.id;
   isLoading.value = true;
   error.value = '';
   try {
-    const response = await apiClient.get(`/api/tournaments/${tournamentId}`);
+    const response = await apiClient.get(`/api/tournaments/${route.params.id}`);
     tournament.value = response.data;
   } catch (err) {
-    console.error('Error fetching tournament details:', err.response);
     error.value = err.response?.data?.message || 'Failed to fetch tournament details.';
   } finally {
     isLoading.value = false;
   }
 };
 
-const fetchRegistrations = async () => {
-  isLoadingTeams.value = true;
-  try {
-    const response = await apiClient.get(`/api/registrations?tournamentId=${route.params.id}`);
-    registrations.value = response.data;
-  } catch(err) {
-    console.error("Failed to fetch registrations:", err);
-  } finally {
-    isLoadingTeams.value = false;
-  }
-};
-
-const fetchMatches = async () => {
-    try {
-        const response = await apiClient.get(`/api/matches/tournament/${route.params.id}`);
-        matches.value = response.data;
-    } catch(err) {
-        console.error("Failed to fetch matches:", err);
-    }
-};
-
-const fetchMyTeams = async () => {
+const fetchMyCaptainTeams = async () => {
   if (authStore.userRole !== 'player') return;
+  isLoadingMyTeams.value = true;
   try {
-    const response = await apiClient.get('/api/teams');
-    myTeams.value = response.data;
+    const response = await apiClient.get('/api/teams?role=captain');
+    myCaptainTeams.value = response.data;
   } catch (err) {
-    console.error("Failed to fetch user's teams:", err);
+    console.error("Failed to fetch user's captained teams:", err);
+  } finally {
+    isLoadingMyTeams.value = false;
   }
 };
 
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A';
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  return new Date(dateString).toLocaleDateString('en-US', options);
+const checkUserRegistration = async () => {
+    try {
+        const response = await apiClient.get(`/api/registrations/me?tournamentId=${route.params.id}`);
+        userRegistration.value = response.data;
+    } catch(err) {
+        if(err.response?.status !== 404) console.error(err);
+        userRegistration.value = null;
+    }
+}
+
+const showFeedback = (feedbackData) => {
+    feedback.value = feedbackData;
+    setTimeout(() => {
+        feedback.value = { type: '', text: '' };
+    }, 4000);
 };
 
-const formatMatchDate = (dateString) => {
-  if (!dateString) return 'N/A';
-  const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
-  return new Date(dateString).toLocaleString('en-US', options);
+const handleRegistrationsLoaded = (loadedRegistrations) => {
+    approvedRegistrations.value = loadedRegistrations.filter(r => r.status === 'approved');
 };
 
-const formatStatus = (status) => {
-    if (status === 'pending_withdrawal') return 'Pending Withdrawal';
-    return status.charAt(0).toUpperCase() + status.slice(1);
-};
-
-const goToEdit = () => {
-  router.push(`/tournaments/${tournament.value._id}/edit`);
-};
+const goToEdit = () => router.push(`/tournaments/${tournament.value._id}/edit`);
 
 const confirmDelete = async () => {
-  if (window.confirm('Are you sure you want to permanently delete this tournament? This action cannot be undone.')) {
+  if (window.confirm('Are you sure you want to permanently delete this tournament?')) {
     try {
       await apiClient.delete(`/api/tournaments/${tournament.value._id}`);
-      alert('Tournament deleted successfully.');
       router.push('/tournaments');
     } catch (err) {
-      console.error('Failed to delete tournament:', err);
-      error.value = err.response?.data?.message || 'Failed to delete tournament.';
+      showFeedback({ type: 'error', text: err.response?.data?.message || 'Failed to delete tournament.' });
     }
   }
 };
 
-const openRegisterModal = async () => {
-  if (myTeams.value.length === 0) {
-    await fetchMyTeams();
-  }
+const openRegisterModal = () => {
   showRegisterModal.value = true;
   modalError.value = '';
   selectedTeamId.value = '';
+  if (myCaptainTeams.value.length === 0) {
+    fetchMyCaptainTeams();
+  }
 };
 
-const closeRegisterModal = () => {
-  showRegisterModal.value = false;
-};
+const closeRegisterModal = () => showRegisterModal.value = false;
 
 const submitRegistration = async () => {
   isRegisteringTeam.value = true;
@@ -366,36 +283,16 @@ const submitRegistration = async () => {
       tournamentId: tournament.value._id
     });
     closeRegisterModal();
-    fetchRegistrations();
+    showFeedback({ type: 'success', text: 'Team successfully registered! Status is pending.' });
+    checkUserRegistration();
+    if (teamListComp.value) {
+      teamListComp.value.fetchRegistrations();
+    }
   } catch (err) {
     modalError.value = err.response?.data?.message || "Failed to register team.";
   } finally {
     isRegisteringTeam.value = false;
   }
-};
-
-const updateRegistrationStatus = async (registrationId, newStatus) => {
-    try {
-        await apiClient.patch(`/api/registrations/${registrationId}`, { status: newStatus });
-        fetchRegistrations();
-    } catch (err) {
-        console.error("Failed to update registration status:", err);
-        feedback.value = { type: 'error', text: err.response?.data?.message || 'Could not update status.' };
-    }
-};
-
-const requestTeamWithdrawal = async (registrationId) => {
-    if (window.confirm('Are you sure you want to request withdrawal from this tournament? The organizer will have to approve it.')) {
-        feedback.value = {type: '', text: ''};
-        try {
-            const res = await apiClient.post(`/api/registrations/${registrationId}/request-withdrawal`);
-            feedback.value = { type: 'success', text: res.data.message };
-            fetchRegistrations();
-        } catch(err) {
-            console.error("Failed to request withdrawal:", err);
-            feedback.value = { type: 'error', text: err.response?.data?.message || 'Could not request withdrawal.' };
-        }
-    }
 };
 
 const openAddMatchModal = () => {
@@ -410,9 +307,7 @@ const openAddMatchModal = () => {
     };
 };
 
-const closeAddMatchModal = () => {
-    showAddMatchModal.value = false;
-};
+const closeAddMatchModal = () => showAddMatchModal.value = false;
 
 const submitNewMatch = async () => {
     if (newMatch.value.teamA_id && newMatch.value.teamA_id === newMatch.value.teamB_id) {
@@ -424,7 +319,9 @@ const submitNewMatch = async () => {
     try {
         await apiClient.post('/api/matches', newMatch.value);
         closeAddMatchModal();
-        fetchMatches();
+        if (matchListComp.value) {
+          matchListComp.value.fetchMatches();
+        }
     } catch(err) {
         matchModalError.value = err.response?.data?.message || 'Failed to create match.';
     } finally {
@@ -432,26 +329,16 @@ const submitNewMatch = async () => {
     }
 };
 
-const deleteMatch = async (matchId) => {
-    if (window.confirm('Are you sure you want to delete this match?')) {
-        try {
-            await apiClient.delete(`/api/matches/${matchId}`);
-            matches.value = matches.value.filter(m => m._id !== matchId);
-        } catch (err) {
-            console.error("Failed to delete match:", err);
-            feedback.value = { type: 'error', text: err.response?.data?.message || 'Could not delete match.' };
-        }
-    }
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return new Date(dateString).toLocaleDateString('en-US', options);
 };
 
 onMounted(async () => {
   await fetchTournamentDetails();
-  if (tournament.value) {
-    fetchRegistrations();
-    fetchMatches();
-    if(authStore.userRole === 'player'){
-      fetchMyTeams();
-    }
+  if (tournament.value && authStore.userRole === 'player') {
+    checkUserRegistration();
   }
 });
 </script>
@@ -512,6 +399,7 @@ onMounted(async () => {
   justify-content: center;
   gap: 1rem;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .btn-edit, .btn-delete, .btn-register-team {
@@ -612,31 +500,6 @@ onMounted(async () => {
   align-items: center;
 }
 
-.card-header-flex {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
-.card-header-flex h2 {
-    margin-bottom: 0;
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.btn-add-match {
-    background-color: #198754;
-    color: white;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.9rem;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
 .card h2 i {
   margin-right: 0.75rem;
   color: #00AEEF;
@@ -686,132 +549,6 @@ onMounted(async () => {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-
-.teams-list {
-  list-style-type: none;
-  padding: 0;
-  margin: 0;
-}
-
-.team-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0.5rem;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.team-item:last-child {
-  border-bottom: none;
-}
-
-.team-item-main {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.team-item .fa-shield-alt {
-  color: #00AEEF;
-  font-size: 1.2rem;
-}
-
-.team-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.team-name {
-  font-weight: 600;
-  color: #333;
-}
-
-.captain-info {
-  font-size: 0.85rem;
-  color: #888;
-}
-
-.team-item-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.captain-team-actions, .organizer-team-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.btn-sm {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: auto;
-  height: 32px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  padding: 0 0.75rem;
-  font-size: 0.85rem;
-}
-
-.btn-approve {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.btn-approve:hover {
-  background-color: #c3e6cb;
-}
-
-.btn-reject {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
-.btn-reject:hover {
-  background-color: #f5c6cb;
-}
-
-.btn-withdraw {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-.btn-withdraw:hover {
-    background-color: #f5c6cb;
-}
-
-
-.status-badge {
-  font-size: 0.8rem;
-  font-weight: 700;
-  padding: 0.25rem 0.6rem;
-  border-radius: 12px;
-  text-transform: capitalize;
-  white-space: nowrap;
-}
-
-.status-pending {
-  background-color: #fef3c7;
-  color: #92400e;
-}
-
-.status-approved {
-  background-color: #d1fae5;
-  color: #065f46;
-}
-
-.status-rejected {
-  background-color: #fee2e2;
-  color: #991b1b;
-}
-
-.status-pending_withdrawal {
-    background-color: #ffedd5;
-    color: #9a3412;
-}
-
 
 .modal-overlay {
   position: fixed;
@@ -922,76 +659,24 @@ onMounted(async () => {
   font-size: 0.95rem;
   text-align: center;
 }
+
 .feedback-message.success {
   background-color: #d4edda;
   color: #155724;
 }
+
 .feedback-message.error {
   background-color: #f8d7da;
   color: #721c24;
 }
 
-.matches-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-.match-item {
-    position: relative;
-    padding: 1rem;
-    border-bottom: 1px solid #f0f0f0;
-}
-.match-item:last-child {
-    border-bottom: none;
-}
-.match-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 600;
-}
-.match-info .team-name {
-    flex: 1;
-    text-align: center;
-}
-.match-score {
-    font-size: 1.25rem;
-    padding: 0 1rem;
-}
-.match-meta {
-    font-size: 0.85rem;
-    color: #888;
-    text-align: center;
-    margin-top: 0.5rem;
-}
-.group-badge {
-    display: inline-block;
-    background-color: #e9ecef;
-    color: #495057;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    margin-left: 0.5rem;
+.feedback-message.pending {
+    background-color: #fff3cd;
+    color: #856404;
 }
 
-.btn-delete-match {
-    position: absolute;
-    top: 50%;
-    right: 0.5rem;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: #aaa;
-    cursor: pointer;
-    font-size: 0.9rem;
-    padding: 0.5rem;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    line-height: 1;
-    transition: all 0.2s;
-}
-.btn-delete-match:hover {
-    color: #dc3545;
-    background-color: #fee2e2;
+.feedback-message.small {
+    padding: 0.5rem 1rem;
+    margin-top: 0;
 }
 </style>
