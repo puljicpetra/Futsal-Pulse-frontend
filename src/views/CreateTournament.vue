@@ -116,15 +116,19 @@ const submitTournament = async () => {
 
   const formData = new FormData();
 
-  formData.append('name', tournament.value.name);
-  formData.append('location', JSON.stringify(tournament.value.location));
-  formData.append('startDate', tournament.value.startDate);
-  if (tournament.value.endDate) {
-    formData.append('endDate', tournament.value.endDate);
-  }
-  formData.append('surface', tournament.value.surface);
-  formData.append('rules', tournament.value.rules);
+  const tournamentData = JSON.parse(JSON.stringify(tournament.value));
 
+  formData.append('name', tournamentData.name);
+  formData.append('location', JSON.stringify(tournamentData.location));
+  formData.append('startDate', tournamentData.startDate);
+  formData.append('surface', tournamentData.surface);
+
+  if (tournamentData.endDate) {
+    formData.append('endDate', tournamentData.endDate);
+  }
+  if (tournamentData.rules) {
+    formData.append('rules', tournamentData.rules);
+  }
   if (tournamentImageFile.value) {
     formData.append('tournamentImage', tournamentImageFile.value);
   }
@@ -142,7 +146,17 @@ const submitTournament = async () => {
     }, 1500);
 
   } catch (err) {
-    error.value = err.response?.data?.message || 'Failed to create tournament. Please try again.';
+    if (err.response?.data) {
+        if (Array.isArray(err.response.data.errors)) {
+             error.value = err.response.data.errors.map(e => e.msg).join(' ');
+        } else if (err.response.data.message) {
+            error.value = err.response.data.message;
+        } else {
+            error.value = 'An unknown error occurred while creating the tournament.';
+        }
+    } else {
+      error.value = 'Failed to create tournament. Please check your connection.';
+    }
   } finally {
     isSubmitting.value = false;
   }
