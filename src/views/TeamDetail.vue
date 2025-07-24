@@ -45,9 +45,9 @@
                    </div>
                 </div>
                 <div class="player-actions">
-                    <i v-if="player._id === team.captain" class="fas fa-crown captain-icon" title="Team Captain"></i>
+                    <i v-if="player._id === team.captain._id" class="fas fa-crown captain-icon" title="Team Captain"></i>
                     <button 
-                      v-if="isCaptain && player._id !== team.captain" 
+                      v-if="isCaptain && player._id !== team.captain._id" 
                       @click="removePlayer(player._id, player.username)"
                       class="btn-remove-player"
                       title="Remove player"
@@ -165,8 +165,8 @@ const inviteMessage = ref({ type: '', text: '' });
 const removePlayerMessage = ref({ type: '', text: '' });
 
 const isCaptain = computed(() => {
-  if (!authStore.isLoggedIn || !team.value) return false;
-  return authStore.userId === team.value.captain;
+  if (!authStore.isLoggedIn || !team.value || !team.value.captain) return false;
+  return authStore.userId === team.value.captain._id;
 });
 
 const fetchTeamDetails = async () => {
@@ -214,7 +214,7 @@ const invitePlayer = async (playerId, playerUsername) => {
   inviteMessage.value = { type: '', text: '' };
   try {
     await apiClient.post(`/api/teams/${teamId}/invites`, {
-      playerIdToInvite: playerId
+      playerId: playerId
     });
     inviteMessage.value = { type: 'success', text: `Successfully invited ${playerUsername}!` };
     
