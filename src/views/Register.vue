@@ -3,7 +3,7 @@
     <div class="glass-container">
       <div class="login-box">
         <h2>Register</h2>
-        <form @submit.prevent="register">
+        <form @submit.prevent="handleRegister">
           <input
             type="text"
             v-model="username"
@@ -51,8 +51,8 @@
 
 <script setup>
 import { ref } from 'vue';
-import apiClient from '@/services/api';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 
 const username = ref('');
 const email = ref('');
@@ -61,9 +61,11 @@ const role = ref('');
 const error = ref('');
 const success = ref('');
 const isRegistering = ref(false);
-const router = useRouter();
 
-async function register() {
+const router = useRouter();
+const authStore = useAuthStore();
+
+async function handleRegister() {
   if (isRegistering.value) return;
 
   isRegistering.value = true;
@@ -77,7 +79,7 @@ async function register() {
   }
 
   try {
-    const response = await apiClient.post('/auth/register', {
+    const response = await authStore.register({
       username: username.value,
       email: email.value,
       password: password.value,

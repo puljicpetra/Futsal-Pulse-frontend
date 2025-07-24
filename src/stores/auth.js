@@ -4,13 +4,23 @@ import { useRouter } from 'vue-router';
 import apiClient from '@/services/api';
 import { jwtDecode } from 'jwt-decode';
 
+const safeJwtDecode = (token) => {
+    if (!token) return null;
+    try {
+        return jwtDecode(token);
+    } catch (error) {
+        console.error("Failed to decode token:", error);
+        return null;
+    }
+};
+
 export const useAuthStore = defineStore('auth', () => {
     const token = ref(localStorage.getItem('token'));
     const userRole = ref(localStorage.getItem('userRole'));
-    const userId = ref(token.value ? jwtDecode(token.value).id : null); 
-    
-    const unreadInvitationCount = ref(0);
+    const decodedTokenData = computed(() => safeJwtDecode(token.value));
+    const userId = computed(() => decodedTokenData.value?.id || null);
 
+    const unreadInvitationCount = ref(0);
     const allNotifications = ref([]);
     const totalUnreadCount = ref(0);
     
@@ -18,19 +28,8 @@ export const useAuthStore = defineStore('auth', () => {
 
     const isLoggedIn = computed(() => !!token.value);
 
-    async function fetchUnreadInvitationCount() {
-        if (!token.value) return;
-        try {
-            const response = await apiClient.get('/api/notifications/count');
-            unreadInvitationCount.value = response.data.count;
-        } catch (error) {
-            console.error("Failed to fetch invitation count:", error);
-            unreadInvitationCount.value = 0; 
-        }
-    }
-    
     async function fetchAllNotifications() {
-        if (!token.value) return;
+        if (!isLoggedIn.value) return;
         try {
             const response = await apiClient.get('/api/notifications');
             allNotifications.value = response.data;
@@ -42,11 +41,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     function setAuthData(newToken, newRole) {
-        const decodedToken = jwtDecode(newToken);
-        
         token.value = newToken;
         userRole.value = newRole;
-        userId.value = decodedToken.id;
         
         localStorage.setItem('token', newToken);
         localStorage.setItem('userRole', newRole);
@@ -60,7 +56,17 @@ export const useAuthStore = defineStore('auth', () => {
             setAuthData(res.data.jwt_token, res.data.role);
             router.push('/');
         } catch (error) {
-            console.error('Login failed:', error);
+            console.error('Login failed in authStore:', error);
+            throw error;
+        }
+    }
+
+    async function register(userData) {
+        try {
+            const response = await apiClient.post('/auth/register', userData);
+            return response;
+        } catch (error) {
+            console.error('Registration failed in authStore:', error);
             throw error;
         }
     }
@@ -68,14 +74,19 @@ export const useAuthStore = defineStore('auth', () => {
     function logout() {
         token.value = null;
         userRole.value = null;
-        userId.value = null;
         unreadInvitationCount.value = 0;
         allNotifications.value = [];
         totalUnreadCount.value = 0;
         
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
-        router.push('/login');
+        
+        try {
+            router.push('/login');
+        } catch(e) {
+            console.error("Router error on logout:", e)
+            window.location.pathname = '/login';
+        }
     }
 
     if(token.value) {
@@ -88,9 +99,9 @@ export const useAuthStore = defineStore('auth', () => {
         userId, 
         isLoggedIn, 
         login, 
-        logout, 
+        logout,
+        register,
         unreadInvitationCount,
-        fetchUnreadInvitationCount,
         allNotifications,
         totalUnreadCount,
         fetchAllNotifications
