@@ -141,6 +141,7 @@ h1 {
   font-weight: 600;
   transition: all 0.3s;
 }
+
 .btn-create:hover {
   background-color: #008fbf;
   box-shadow: 0 4px 15px #008fbf(40, 167, 69, 0.2);
@@ -177,6 +178,7 @@ h1 {
   align-items: center;
   gap: 0.75rem;
 }
+
 .card-header .fa-shield-alt {
   color: #00AEEF;
 }
@@ -221,6 +223,7 @@ h1 {
   justify-content: center;
   gap: 0.5rem;
 }
+
 .btn-details:hover {
   background-color: #1f2937;
 }
@@ -229,19 +232,23 @@ h1 {
   text-align: center;
   padding: 4rem 1rem;
 }
+
 .empty-state-icon {
   font-size: 3rem;
   color: #d1d5db;
 }
+
 .empty-state h2 {
   color: #1f2937;
   margin-top: 1.5rem;
 }
+
 .empty-state p {
   color: #6b7280;
   max-width: 450px;
   margin: 0.5rem auto 1.5rem;
 }
+
 .btn-create-main {
   background-color: #008fbf;
   color: white;
@@ -255,6 +262,7 @@ h1 {
   text-align: center;
   padding: 4rem 1rem;
 }
+
 .spinner {
   border: 4px solid #f3f4f6;
   border-top: 4px solid #00AEEF;
@@ -264,6 +272,7 @@ h1 {
   animation: spin 1s linear infinite;
   margin: 0 auto 1rem;
 }
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }

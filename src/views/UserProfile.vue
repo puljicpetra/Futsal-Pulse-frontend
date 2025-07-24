@@ -276,9 +276,11 @@ onMounted(() => {
   border-bottom: 1px solid #eee;
   padding-bottom: 0.75rem;
 }
+
 .profile-view .profile-field:last-of-type {
   border-bottom: none;
 }
+
 .profile-view .profile-field strong {
   color: #333;
   margin-right: 0.5em;
@@ -305,16 +307,19 @@ onMounted(() => {
   border-radius: 4px;
   max-width: 90%;
 }
+
 .loading-message {
   color: #007bff;
   background-color: #e7f3ff;
   border: 1px solid #b3d7ff;
 }
+
 .error-message {
   color: #721c24;
   background-color: #f8d7da;
   border: 1px solid #f5c6cb;
 }
+
 .success-message {
   color: #155724;
   background-color: #d4edda;

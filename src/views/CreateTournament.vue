@@ -227,6 +227,7 @@ h2 {
   color: #333;
   margin: 0;
 }
+
 .form-header p {
   color: #666;
   max-width: 80%;
@@ -378,6 +379,7 @@ textarea {
   background-color: #f8d7da;
   border: 1px solid #f5c6cb;
 }
+
 .success-message {
   color: #155724;
   background-color: #d4edda;
@@ -392,6 +394,7 @@ textarea {
   height: 16px;
   animation: spin 1s linear infinite;
 }
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }

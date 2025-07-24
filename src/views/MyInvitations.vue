@@ -161,6 +161,7 @@ h1 {
   align-items: center;
   gap: 0.75rem;
 }
+
 h1 i {
   color: #00AEEF;
 }
@@ -203,6 +204,7 @@ h1 i {
   color: #6b7280;
   font-size: 0.9rem;
 }
+
 .team-name {
   font-size: 1.5rem;
   font-weight: 700;
@@ -219,6 +221,7 @@ h1 i {
 .captain-info, .players-info {
     font-size: 0.95rem;
 }
+
 .captain-info strong, .players-info strong {
     color: #343a40;
     margin-right: 0.5rem;
@@ -236,6 +239,7 @@ h1 i {
     flex-wrap: wrap;
     gap: 0.5rem;
 }
+
 .player-tag {
     background-color: #e9ecef;
     color: #495057;
@@ -266,6 +270,7 @@ h1 i {
   justify-content: center;
   gap: 0.5rem;
 }
+
 .btn-accept:disabled, .btn-reject:disabled {
     cursor: not-allowed;
     opacity: 0.7;
@@ -275,6 +280,7 @@ h1 i {
   background-color: #28a745;
   color: white;
 }
+
 .btn-accept:hover:not(:disabled) {
   background-color: #218838;
 }
@@ -283,6 +289,7 @@ h1 i {
   background-color: #dc3545;
   color: white;
 }
+
 .btn-reject:hover:not(:disabled) {
   background-color: #c82333;
 }
@@ -294,10 +301,12 @@ h1 i {
   text-align: center;
   font-weight: 500;
 }
+
 .feedback-message.success {
   background-color: #d4edda;
   color: #155724;
 }
+
 .feedback-message.error {
   background-color: #f8d7da;
   color: #721c24;
@@ -307,15 +316,29 @@ h1 i {
   text-align: center;
   padding: 4rem 1rem;
 }
+
 .empty-state {
   margin-top: 2rem;
   background-color: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
 }
-.empty-state-icon { font-size: 3rem; color: #d1d5db; }
-.empty-state h2 { color: #1f2937; margin-top: 1.5rem; }
-.empty-state p { color: #6b7280; max-width: 450px; margin: 0.5rem auto 1.5rem; }
+
+.empty-state-icon { 
+  font-size: 3rem; 
+  color: #d1d5db; 
+}
+
+.empty-state h2 { 
+  color: #1f2937; 
+  margin-top: 1.5rem; 
+}
+
+.empty-state p { 
+  color: #6b7280; 
+  max-width: 450px; 
+  margin: 0.5rem auto 1.5rem; 
+}
 
 .spinner {
   border: 4px solid #f3f4f6;
@@ -326,6 +349,7 @@ h1 i {
   animation: spin 1s linear infinite;
   margin: 0 auto 1rem;
 }
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
