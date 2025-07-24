@@ -8,8 +8,8 @@
       <div class="profile-header">
         <div class="avatar-container">
           <img 
-            v-if="user.profile_image_url" 
-            :src="`http://localhost:3001${user.profile_image_url}`" 
+            v-if="profileImageUrl" 
+            :src="profileImageUrl" 
             alt="Profile Avatar" 
             class="profile-avatar"
           />
@@ -92,6 +92,17 @@ const isSaving = ref(false);
 const saveError = ref('');
 const saveSuccess = ref('');
 const fileInput = ref(null);
+
+const profileImageUrl = computed(() => {
+  if (user.value?.profile_image_url) {
+    const baseUrl = apiClient.defaults.baseURL;
+    const imagePath = user.value.profile_image_url.startsWith('/') 
+      ? user.value.profile_image_url 
+      : `/${user.value.profile_image_url}`;
+    return `${baseUrl}${imagePath}`;
+  }
+  return null;
+});
 
 const formattedRole = computed(() => {
   if (user.value && user.value.role) {
