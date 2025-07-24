@@ -37,7 +37,7 @@
             <ul class="players-list" :class="{ 'two-columns': team.players.length > 4 }">
               <li v-for="player in team.players" :key="player._id" class="player-item">
                 <div class="player-info">
-                   <img v-if="player.profile_image_url" :src="`http://localhost:3001${player.profile_image_url}`" class="avatar-sm" alt="avatar" />
+                   <img v-if="player.profile_image_url" :src="getImageUrl(player.profile_image_url)" class="avatar-sm" alt="avatar" />
                    <i v-else class="fas fa-user-circle avatar-placeholder"></i>
                    <div class="player-name-details">
                      <span class="player-full-name">{{ player.full_name || player.username }}</span>
@@ -90,7 +90,7 @@
                 <ul v-if="searchResults.length > 0" class="search-results-list">
                   <li v-for="player in searchResults" :key="player._id" class="search-result-item">
                     <div class="player-info">
-                      <img v-if="player.profile_image_url" :src="`http://localhost:3001${player.profile_image_url}`" class="avatar-sm" alt="avatar" />
+                      <img v-if="player.profile_image_url" :src="getImageUrl(player.profile_image_url)" class="avatar-sm" alt="avatar" />
                       <i v-else class="fas fa-user-circle avatar-placeholder"></i>
                       <div class="player-name-details">
                         <span class="player-full-name">{{ player.full_name || player.username }}</span>
@@ -143,6 +143,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
+import { getImageUrl } from '@/utils/url.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -306,6 +307,7 @@ onMounted(() => {
   font-weight: 600;
   transition: color 0.2s;
 }
+
 .back-link:hover {
   color: #00AEEF;
 }
@@ -343,6 +345,7 @@ onMounted(() => {
   font-size: 0.8rem;
   font-weight: 600;
 }
+
 .captain-badge .fa-crown {
   margin-right: 0.4rem;
 }
@@ -379,6 +382,7 @@ onMounted(() => {
   align-items: center;
   gap: 0.75rem;
 }
+
 .card h2 .fa-users, .card h2 .fa-user-plus {
   color: #00AEEF;
 }
@@ -396,7 +400,6 @@ onMounted(() => {
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
 }
-
 
 .player-item {
   display: flex;
@@ -519,6 +522,7 @@ onMounted(() => {
   border-radius: 50%;
   object-fit: cover;
 }
+
 .avatar-placeholder {
   font-size: 40px;
   color: #adb5bd;
@@ -541,10 +545,12 @@ onMounted(() => {
   text-align: center;
   transition: background-color 0.2s ease-in-out;
 }
+
 .btn-invite.pending {
   background-color: #6c757d;
   cursor: not-allowed;
 }
+
 .btn-invite:disabled {
   background-color: #9ca3af;
 }
@@ -561,6 +567,7 @@ onMounted(() => {
   background-color: #d4edda;
   color: #155724;
 }
+
 .invite-feedback.error {
   background-color: #f8d7da;
   color: #721c24;
@@ -582,6 +589,7 @@ onMounted(() => {
   border: 2px solid #6b7280;
   border-top-color: #f9fafb;
 }
+
 .spinner-sm-light {
   border: 2px solid rgba(255, 255, 255, 0.5);
   border-top-color: #fff;
@@ -621,10 +629,12 @@ onMounted(() => {
   font-size: 0.95rem;
   text-align: center;
 }
+
 .feedback-message-global.success {
   background-color: #d4edda;
   color: #155724;
 }
+
 .feedback-message-global.error {
   background-color: #f8d7da;
   color: #721c24;
@@ -656,6 +666,7 @@ onMounted(() => {
     font-weight: 600;
     cursor: pointer;
 }
+
 .btn-danger:hover {
     background-color: #c82333;
 }
@@ -666,6 +677,7 @@ onMounted(() => {
     background-color: #f8f9fa;
     border-radius: 8px;
 }
+
 .team-full-message .fa-exclamation-circle {
     font-size: 2rem;
     color: #00AEEF;
