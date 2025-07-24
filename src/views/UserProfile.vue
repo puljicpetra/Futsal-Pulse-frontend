@@ -8,8 +8,8 @@
       <div class="profile-header">
         <div class="avatar-container">
           <img 
-            v-if="profileImageUrl" 
-            :src="profileImageUrl" 
+            v-if="user.profile_image_url" 
+            :src="getImageUrl(user.profile_image_url)" 
             alt="Profile Avatar" 
             class="profile-avatar"
           />
@@ -82,6 +82,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import apiClient from '@/services/api';
+import { getImageUrl } from '@/utils/url.js';
 
 const user = ref(null);
 const editableUser = ref({});
@@ -93,16 +94,6 @@ const saveError = ref('');
 const saveSuccess = ref('');
 const fileInput = ref(null);
 
-const profileImageUrl = computed(() => {
-  if (user.value?.profile_image_url) {
-    const baseUrl = apiClient.defaults.baseURL;
-    const imagePath = user.value.profile_image_url.startsWith('/') 
-      ? user.value.profile_image_url 
-      : `/${user.value.profile_image_url}`;
-    return `${baseUrl}${imagePath}`;
-  }
-  return null;
-});
 
 const formattedRole = computed(() => {
   if (user.value && user.value.role) {

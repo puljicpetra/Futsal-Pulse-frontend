@@ -59,7 +59,7 @@
             <div class="card-image-container">
               <img 
                 v-if="tournament.imageUrl" 
-                :src="`http://localhost:3001${tournament.imageUrl}`" 
+                :src="getImageUrl(tournament.imageUrl)" 
                 alt="Tournament Image" 
                 class="card-image"
               >
@@ -99,6 +99,7 @@
 import { ref, onMounted } from 'vue';
 import apiClient from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
+import { getImageUrl } from '@/utils/url.js';
 
 const authStore = useAuthStore();
 const tournaments = ref([]);
