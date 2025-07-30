@@ -11,7 +11,7 @@
       <router-link to="/tournaments" class="btn-back">Back to Tournaments</router-link>
     </div>
 
-    <div v-else class="form-card">
+    <div v-else-if="tournament" class="form-card">
       
       <router-link :to="`/tournaments/${tournamentId}`" class="back-link">
         <i class="fas fa-arrow-left"></i> Back to Tournament
@@ -72,7 +72,7 @@
         <div class="form-group">
           <label for="tournamentImage">Change Tournament Image (optional)</label>
           <div class="current-image-preview" v-if="tournament.imageUrl && !newImagePreviewUrl">
-            <img :src="`http://localhost:3001${tournament.imageUrl}`" alt="Current image" />
+            <img :src="getImageUrl(tournament.imageUrl)" alt="Current image" />
             <span>Current Image</span>
           </div>
            <div class="current-image-preview" v-if="newImagePreviewUrl">
@@ -100,9 +100,12 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/services/api';
+import { useAuthStore } from '@/stores/auth';
+import { getImageUrl } from '@/utils/url.js';
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 const tournamentId = route.params.id;
 
 const tournament = ref({ location: {} });
@@ -132,6 +135,13 @@ const formattedEndDate = computed({
 const fetchTournamentData = async () => {
   try {
     const response = await apiClient.get(`/api/tournaments/${tournamentId}`);
+
+    if (response.data.organizer !== authStore.userId) {
+      error.value = "You do not have permission to edit this tournament.";
+      setTimeout(() => router.push(`/tournaments/${tournamentId}`), 3000);
+      return;
+    }
+    
     tournament.value = response.data;
   } catch (err) {
     console.error("Failed to fetch tournament data:", err);
@@ -185,7 +195,17 @@ const submitUpdate = async () => {
     }, 3000);
 
   } catch (err) {
-    updateError.value = err.response?.data?.message || 'Failed to update tournament.';
+    if (err.response?.data) {
+        if (Array.isArray(err.response.data.errors)) {
+             updateError.value = err.response.data.errors.map(e => e.msg).join(' ');
+        } else if (err.response.data.message) {
+            updateError.value = err.response.data.message;
+        } else {
+            updateError.value = 'An unknown error occurred while saving.';
+        }
+    } else {
+      updateError.value = 'Failed to update tournament. Please try again.';
+    }
   } finally {
     isSubmitting.value = false;
   }
@@ -354,15 +374,22 @@ textarea:focus {
 }
 
 .spinner, .spinner-sm {
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid #fff;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #00AEEF;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 1rem;
 }
 
 .spinner-sm {
   width: 16px;
   height: 16px;
+  border-top-color: #fff;
 }
 
 .current-image-preview {
