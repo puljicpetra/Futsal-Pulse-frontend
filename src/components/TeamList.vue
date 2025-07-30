@@ -58,7 +58,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['feedback', 'registrationChanged']);
+const emit = defineEmits(['feedback', 'registrations-loaded']);
 
 const authStore = useAuthStore();
 const registrations = ref([]);
@@ -67,7 +67,7 @@ const isLoading = ref(true);
 
 const isCaptainOf = (teamId) => {
   if (authStore.userRole !== 'player') return false;
-  return myTeams.value.some(team => team._id === teamId && team.captain === authStore.userId);
+  return myTeams.value && myTeams.value.some(team => team._id === teamId && team.captain === authStore.userId);
 };
 
 const fetchRegistrations = async () => {
@@ -75,6 +75,7 @@ const fetchRegistrations = async () => {
   try {
     const response = await apiClient.get(`/api/registrations?tournamentId=${props.tournamentId}`);
     registrations.value = response.data;
+    emit('registrations-loaded', response.data);
   } catch(err) {
     console.error("Failed to fetch registrations:", err);
     emit('feedback', { type: 'error', text: 'Could not load registered teams.' });
