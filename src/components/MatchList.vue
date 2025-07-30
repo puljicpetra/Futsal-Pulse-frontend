@@ -33,7 +33,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineProps, defineEmits } from 'vue';
+import { ref, onMounted } from 'vue';
 import apiClient from '@/services/api';
 
 const props = defineProps({
@@ -47,7 +47,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['feedback']);
+const emit = defineEmits(['feedback', 'add-match']);
 
 const matches = ref([]);
 const isLoading = ref(true);

@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineProps, defineEmits } from 'vue';
+import { ref, onMounted } from 'vue';
 import apiClient from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
 
