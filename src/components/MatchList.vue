@@ -15,7 +15,7 @@
         <li v-for="match in matches" :key="match._id" class="match-item">
             <div class="match-info">
                 <span class="team-name">{{ match.teamA?.name || 'TBD' }}</span>
-                <span class="match-score" :class="{ 'clickable-score': isOwner }" @click="isOwner && openScoreModal(match)">
+                <span class="match-score" :class="{ 'clickable-score': isOwner && match.status !== 'finished' }" @click="isOwner && match.status !== 'finished' && openScoreModal(match)">
                     {{ match.score.teamA !== null ? match.score.teamA : '-' }} : {{ match.score.teamB !== null ? match.score.teamB : '-' }}
                 </span>
                 <span class="team-name">{{ match.teamB?.name || 'TBD' }}</span>
@@ -25,21 +25,23 @@
                 <span v-if="match.status === 'finished'" class="status-badge finished">Final</span>
                 <span v-else-if="match.group" class="group-badge">{{ match.group }}</span>
             </div>
+            
             <div v-if="isOwner" class="owner-actions">
-                <button 
-                  v-if="match.status !== 'finished'"
-                  @click="finishMatch(match._id)" 
-                  class="btn-finish-match" 
-                  title="Mark as Finished"
-                >
-                    <i class="fas fa-flag-checkered"></i>
-                </button>
-                <button @click="openScoreModal(match)" class="btn-edit-score" title="Update Score">
-                    <i class="fas fa-pencil-alt"></i>
-                </button>
-                <button @click="deleteMatch(match._id)" class="btn-delete-match" title="Delete Match">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
+              <button @click.stop="toggleMenu(match._id)" class="btn-menu" title="Actions">
+                <i class="fas fa-ellipsis-v"></i>
+              </button>
+
+              <div v-if="openMenuId === match._id" class="actions-dropdown">
+                <a v-if="match.status !== 'finished'" @click="finishMatch(match._id)">
+                  <i class="fas fa-flag-checkered"></i> Finish Match
+                </a>
+                <a @click="openScoreModal(match)">
+                  <i class="fas fa-pencil-alt"></i> Update Score
+                </a>
+                <a @click="deleteMatch(match._id)" class="text-danger">
+                  <i class="fas fa-trash-alt"></i> Delete Match
+                </a>
+              </div>
             </div>
         </li>
     </ul>
@@ -68,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import apiClient from '@/services/api';
 
 const props = defineProps({
@@ -93,6 +95,8 @@ const isUpdatingScore = ref(false);
 const scoreModalError = ref('');
 const score = ref({ teamA: 0, teamB: 0 });
 
+const openMenuId = ref(null);
+
 const fetchMatches = async () => {
   isLoading.value = true;
   try {
@@ -106,7 +110,20 @@ const fetchMatches = async () => {
   }
 };
 
+const closeMenu = () => {
+  openMenuId.value = null;
+};
+
+const toggleMenu = (matchId) => {
+  if (openMenuId.value === matchId) {
+    closeMenu();
+  } else {
+    openMenuId.value = matchId;
+  }
+};
+
 const deleteMatch = async (matchId) => {
+  closeMenu();
   if (window.confirm('Are you sure you want to delete this match?')) {
     try {
       await apiClient.delete(`/api/matches/${matchId}`);
@@ -126,6 +143,7 @@ const formatMatchDate = (dateString) => {
 };
 
 const openScoreModal = (match) => {
+    closeMenu();
     selectedMatch.value = match;
     score.value.teamA = match.score.teamA ?? 0;
     score.value.teamB = match.score.teamB ?? 0;
@@ -142,15 +160,17 @@ const submitScoreUpdate = async () => {
     isUpdatingScore.value = true;
     scoreModalError.value = '';
     try {
-        await apiClient.put(`/api/matches/${selectedMatch.value._id}`, {
+        const response = await apiClient.put(`/api/matches/${selectedMatch.value._id}`, {
             scoreA: score.value.teamA,
             scoreB: score.value.teamB
         });
         
+        const index = matches.value.findIndex(m => m._id === selectedMatch.value._id);
+        if (index !== -1) {
+            matches.value[index] = response.data.match;
+        }
         closeScoreModal();
         emit('feedback', { type: 'success', text: 'Score updated successfully!' });
-        await fetchMatches();
-
     } catch (err) {
         console.error("Failed to update score:", err);
         scoreModalError.value = err.response?.data?.message || 'Failed to update score.';
@@ -160,23 +180,31 @@ const submitScoreUpdate = async () => {
 };
 
 const finishMatch = async (matchId) => {
+    closeMenu();
+    if (!confirm("Are you sure you want to finalize this match? The result cannot be edited after this.")) {
+      return;
+    }
     try {
         const response = await apiClient.patch(`/api/matches/${matchId}/finish`);
-
         const index = matches.value.findIndex(m => m._id === matchId);
         if (index !== -1) {
-            matches.value[index] = response.data.match;
+            matches.value[index] = response.data.match; // Update the whole match
         }
-        
         emit('feedback', { type: 'success', text: 'Match marked as finished!' });
-
     } catch (err) {
         console.error("Failed to finish match:", err);
         emit('feedback', { type: 'error', text: err.response?.data?.message || 'Could not finish match.' });
     }
 };
 
-onMounted(fetchMatches);
+onMounted(() => {
+  fetchMatches();
+  window.addEventListener('click', closeMenu);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('click', closeMenu);
+});
 
 defineExpose({
     fetchMatches
@@ -199,13 +227,13 @@ defineExpose({
 }
 
 .card-header-flex h2 {
-  margin-bottom: 0;
-  border-bottom: none;
-  padding-bottom: 0;
+  margin: 0;
+  padding: 0;
   font-size: 1.5rem;
   color: #333;
   display: flex;
   align-items: center;
+  border: none;
 }
 
 .card-header-flex h2 i {
@@ -240,9 +268,9 @@ defineExpose({
 }
 
 .match-item {
-  position: relative;
   padding: 1rem;
   border-bottom: 1px solid #f0f0f0;
+  position: relative;
 }
 
 .match-item:last-child {
@@ -267,8 +295,8 @@ defineExpose({
 }
 
 .clickable-score {
-    cursor: pointer;
-    border-bottom: 2px dotted #00AEEF;
+  cursor: pointer;
+  border-bottom: 2px dotted #00AEEF;
 }
 
 .match-meta {
@@ -298,44 +326,80 @@ defineExpose({
 }
 
 .owner-actions {
-    position: absolute;
-    top: 50%;
-    right: 0.5rem;
-    transform: translateY(-50%);
-    display: flex;
-    gap: 0.5rem;
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
 }
 
-.btn-finish-match, .btn-edit-score, .btn-delete-match {
+.btn-menu {
   background: none;
   border: none;
   color: #aaa;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 1rem;
   padding: 0.5rem;
   border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  line-height: 1;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background-color 0.2s;
 }
 
-.btn-finish-match:hover {
-    color: #198754;
-    background-color: #d1e7dd;
+.btn-menu:hover {
+  background-color: #f0f0f0;
+  color: #333;
 }
 
-.btn-edit-score:hover {
-    color: #ffc107;
-    background-color: #fff3cd;
+.actions-dropdown {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  border: 1px solid #eee;
+  padding: 0.5rem 0;
+  z-index: 10;
+  width: 180px;
+  overflow: hidden;
 }
 
-.btn-delete-match:hover {
+.actions-dropdown a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  color: #333;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.actions-dropdown a:hover {
+  background-color: #f5f5f5;
+}
+
+.actions-dropdown a i {
+  width: 16px;
+  text-align: center;
+  color: #888;
+}
+
+.actions-dropdown a.text-danger {
   color: #dc3545;
+}
+
+.actions-dropdown a.text-danger:hover {
   background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.actions-dropdown a.text-danger i {
+  color: #dc3545;
 }
 
 .modal-overlay {
@@ -359,29 +423,34 @@ defineExpose({
   max-width: 400px;
 }
 
-.modal-content h3 { margin-top: 0; }
-.modal-content p { color: #666; }
+.modal-content h3 {
+  margin-top: 0;
+}
+
+.modal-content p {
+  color: #666;
+}
 
 .score-input-group {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-    margin: 2rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 2rem 0;
 }
 
 .score-input-group input {
-    width: 80px;
-    padding: 0.75rem;
-    font-size: 1.5rem;
-    text-align: center;
-    border: 1px solid #ccc;
-    border-radius: 8px;
+  width: 80px;
+  padding: 0.75rem;
+  font-size: 1.5rem;
+  text-align: center;
+  border: 1px solid #ccc;
+  border-radius: 8px;
 }
 
 .score-input-group span {
-    font-size: 1.5rem;
-    font-weight: bold;
+  font-size: 1.5rem;
+  font-weight: bold;
 }
 
 .modal-actions {
@@ -398,8 +467,29 @@ defineExpose({
   cursor: pointer;
   border: none;
 }
-.btn-cancel { background-color: #f0f0f0; }
-.btn-submit { background-color: #28a745; color: white; }
-.btn-submit:disabled { background-color: #a0a0a0; }
-.error-message { color: #dc3545; text-align: center; margin-top: 1rem; }
+
+.btn-cancel {
+  background-color: #e9ecef;
+  color: #343a40;
+  border: 1px solid #ced4da;
+}
+
+.btn-cancel:hover {
+  background-color: #dee2e6;
+}
+
+.btn-submit {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-submit:disabled {
+  background-color: #a0a0a0;
+}
+
+.error-message {
+  color: #dc3545;
+  text-align: center;
+  margin-top: 1rem;
+}
 </style>
