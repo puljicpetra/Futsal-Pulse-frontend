@@ -8,100 +8,117 @@
     </div>
     
     <div v-if="isLoading" class="loading-state-small">Loading matches...</div>
-    <div v-else-if="matches.length === 0" class="text-muted">
-        No matches scheduled yet.
-    </div>
+    <div v-else-if="matches.length === 0" class="text-muted">No matches scheduled yet.</div>
+    
     <ul v-else class="matches-list">
         <li v-for="match in matches" :key="match._id" class="match-item">
             <div class="match-info">
-                <span class="team-name">{{ match.teamA?.name || 'TBD' }}</span>
-                <span class="match-score" :class="{ 'clickable-score': isOwner && match.status !== 'finished' }" @click="isOwner && match.status !== 'finished' && openScoreModal(match)">
-                    {{ match.score.teamA !== null ? match.score.teamA : '-' }} : {{ match.score.teamB !== null ? match.score.teamB : '-' }}
-                </span>
-                <span class="team-name">{{ match.teamB?.name || 'TBD' }}</span>
+                <span class="team-name">{{ match.teamA.name || 'TBD' }}</span>
+                <span class="match-score">{{ match.score.teamA ?? '-' }} : {{ match.score.teamB ?? '-' }}</span>
+                <span class="team-name">{{ match.teamB.name || 'TBD' }}</span>
             </div>
             <div class="match-meta">
                 <span>{{ formatMatchDate(match.matchDate) }}</span>
                 <span v-if="match.status === 'finished'" class="status-badge finished">Final</span>
                 <span v-else-if="match.group" class="group-badge">{{ match.group }}</span>
             </div>
+
+            <div v-if="match.events && match.events.length > 0" class="event-timeline">
+                <div v-for="event in sortedEvents(match.events)" :key="event._id" class="event-item">
+                    <i :class="getEventIcon(event.type)"></i>
+                    <span>{{ event.minute }}'</span>
+                    <span>{{ getPlayerName(event.playerId) }}</span> 
+                </div>
+            </div>
             
             <div v-if="isOwner" class="owner-actions">
-              <button @click.stop="toggleMenu(match._id)" class="btn-menu" title="Actions">
-                <i class="fas fa-ellipsis-v"></i>
-              </button>
-
-              <div v-if="openMenuId === match._id" class="actions-dropdown">
-                <a v-if="match.status !== 'finished'" @click="finishMatch(match._id)">
-                  <i class="fas fa-flag-checkered"></i> Finish Match
-                </a>
-                <a @click="openScoreModal(match)">
-                  <i class="fas fa-pencil-alt"></i> Update Score
-                </a>
-                <a @click="deleteMatch(match._id)" class="text-danger">
-                  <i class="fas fa-trash-alt"></i> Delete Match
-                </a>
-              </div>
+                <button @click.stop="toggleMenu(match._id)" class="btn-menu" title="Actions"><i class="fas fa-ellipsis-v"></i></button>
+                <div v-if="openMenuId === match._id" class="actions-dropdown">
+                    <a v-if="match.status !== 'finished'" @click="openEventsModal(match)"><i class="fas fa-stopwatch"></i> Manage Events</a>
+                    <a v-if="match.status !== 'finished'" @click="finishMatch(match._id)"><i class="fas fa-flag-checkered"></i> Finish Match</a>
+                    <a @click="deleteMatch(match._id)" class="text-danger"><i class="fas fa-trash-alt"></i> Delete Match</a>
+                </div>
             </div>
         </li>
     </ul>
   </section>
 
-  <div v-if="showScoreModal" class="modal-overlay" @click.self="closeScoreModal">
-    <div class="modal-content">
-        <h3>Update Match Score</h3>
-        <p v-if="selectedMatch">{{ selectedMatch.teamA?.name }} vs {{ selectedMatch.teamB?.name }}</p>
-        <form @submit.prevent="submitScoreUpdate">
-            <div class="score-input-group">
-                <input type="number" v-model.number="score.teamA" min="0" required />
-                <span>:</span>
-                <input type="number" v-model.number="score.teamB" min="0" required />
-            </div>
-            <div class="modal-actions">
-                <button type="button" @click="closeScoreModal" class="btn-cancel">Cancel</button>
-                <button type="submit" :disabled="isUpdatingScore" class="btn-submit">
-                    {{ isUpdatingScore ? 'Saving...' : 'Save Score' }}
-                </button>
-            </div>
-            <p v-if="scoreModalError" class="error-message">{{ scoreModalError }}</p>
+  <div v-if="showEventsModal" class="modal-overlay" @click.self="closeEventsModal">
+    <div class="modal-content large">
+        <h3>Manage Match Events</h3>
+        <p v-if="selectedMatch">{{ selectedMatch.teamA.name }} vs {{ selectedMatch.teamB.name }}</p>
+        
+        <form @submit.prevent="handleAddEvent" class="event-form">
+            <select v-model="newEvent.teamId" required>
+                <option :value="null" disabled>Select Team</option>
+                <option :value="selectedMatch.teamA._id">{{ selectedMatch.teamA.name }}</option>
+                <option :value="selectedMatch.teamB._id">{{ selectedMatch.teamB.name }}</option>
+            </select>
+            <select v-model="newEvent.playerId" required :disabled="!newEvent.teamId">
+                <option :value="null" disabled>Select Player</option>
+                <option v-for="player in availablePlayers" :key="player._id" :value="player._id">{{ player.name }}</option>
+            </select>
+            <select v-model="newEvent.type" required>
+                <option value="goal">Goal</option>
+                <option value="yellow-card">Yellow Card</option>
+                <option value="red-card">Red Card</option>
+            </select>
+            <input type="number" v-model.number="newEvent.minute" placeholder="Min" min="1" required />
+            <button type="submit" class="btn-submit small" :disabled="isSubmittingEvent">Add</button>
         </form>
+
+        <div class="existing-events-list">
+            <div v-if="!sortedEvents(selectedMatch.events).length" class="text-muted">No events recorded.</div>
+            <div v-else v-for="event in sortedEvents(selectedMatch.events)" :key="event._id" class="existing-event-item">
+                <span><i :class="getEventIcon(event.type)"></i> {{ event.minute }}' - {{ getPlayerName(event.playerId) }} ({{ getTeamName(event.teamId) }})</span>
+                <button @click="handleDeleteEvent(selectedMatch._id, event._id)" class="btn-delete-event" title="Delete Event"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+
+        <div class="modal-actions"><button type="button" @click="closeEventsModal" class="btn-cancel">Done</button></div>
+        <p v-if="eventsModalError" class="error-message">{{ eventsModalError }}</p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import apiClient from '@/services/api';
 
 const props = defineProps({
-  tournamentId: {
-    type: String,
-    required: true
-  },
-  isOwner: {
-    type: Boolean,
-    default: false
-  }
+  tournamentId: { type: String, required: true },
+  isOwner: { type: Boolean, default: false }
 });
-
 const emit = defineEmits(['feedback', 'add-match']);
 
 const matches = ref([]);
 const isLoading = ref(true);
-
-const showScoreModal = ref(false);
-const selectedMatch = ref(null);
-const isUpdatingScore = ref(false);
-const scoreModalError = ref('');
-const score = ref({ teamA: 0, teamB: 0 });
-
 const openMenuId = ref(null);
+const allPlayers = ref(new Map());
+
+const showEventsModal = ref(false);
+const selectedMatch = ref(null);
+const isSubmittingEvent = ref(false);
+const eventsModalError = ref('');
+const newEvent = ref({ type: 'goal', teamId: null, playerId: null, minute: '' });
 
 const fetchMatches = async () => {
   isLoading.value = true;
+  allPlayers.value.clear();
   try {
     const response = await apiClient.get(`/api/matches/tournament/${props.tournamentId}`);
-    matches.value = response.data;
+    const fetchedMatches = response.data;
+    
+    for (const match of fetchedMatches) {
+      if (match.teamA && match.teamA.players) {
+        match.teamA.players.forEach(p => allPlayers.value.set(p._id, p));
+      }
+      if (match.teamB && match.teamB.players) {
+        match.teamB.players.forEach(p => allPlayers.value.set(p._id, p));
+      }
+    }
+    
+    matches.value = fetchedMatches;
   } catch (err) {
     console.error("Failed to fetch matches:", err);
     emit('feedback', { type: 'error', text: 'Could not load match schedule.' });
@@ -110,16 +127,85 @@ const fetchMatches = async () => {
   }
 };
 
-const closeMenu = () => {
-  openMenuId.value = null;
+const availablePlayers = computed(() => {
+    if (!newEvent.value.teamId || !selectedMatch.value) return [];
+    
+    return newEvent.value.teamId === selectedMatch.value.teamA._id 
+        ? selectedMatch.value.teamA.players
+        : selectedMatch.value.teamB.players;
+});
+
+const formatMatchDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+  return new Date(dateString).toLocaleString('en-US', options);
+};
+const sortedEvents = (events) => {
+    if (!events) return [];
+    return [...events].sort((a, b) => a.minute - b.minute);
+};
+const getEventIcon = (type) => ({
+    'goal': 'fas fa-futbol',
+    'yellow-card': 'fas fa-square yellow-card',
+    'red-card': 'fas fa-square red-card'
+}[type] || 'fas fa-question');
+
+const getPlayerName = (playerId) => allPlayers.value.get(playerId)?.name || 'Unknown'; 
+const getTeamName = (teamId) => {
+    if (!selectedMatch.value) return '';
+    if (selectedMatch.value.teamA?._id === teamId) return selectedMatch.value.teamA.name;
+    if (selectedMatch.value.teamB?._id === teamId) return selectedMatch.value.teamB.name;
+    return 'Unknown';
 };
 
-const toggleMenu = (matchId) => {
-  if (openMenuId.value === matchId) {
+const closeMenu = () => { openMenuId.value = null; };
+const toggleMenu = (matchId) => { openMenuId.value = openMenuId.value === matchId ? null : matchId; };
+const closeEventsModal = () => { showEventsModal.value = false; selectedMatch.value = null; };
+
+const openEventsModal = (match) => {
     closeMenu();
-  } else {
-    openMenuId.value = matchId;
-  }
+    selectedMatch.value = match;
+    eventsModalError.value = '';
+    newEvent.value = { type: 'goal', teamId: null, playerId: null, minute: '' };
+    showEventsModal.value = true;
+};
+
+const handleAddEvent = async () => {
+    isSubmittingEvent.value = true;
+    eventsModalError.value = '';
+    try {
+        const response = await apiClient.post(`/api/matches/${selectedMatch.value._id}/events`, newEvent.value);
+        const updatedMatch = response.data.match;
+        
+        updatedMatch.teamA.players.forEach(p => allPlayers.value.set(p._id, p));
+        updatedMatch.teamB.players.forEach(p => allPlayers.value.set(p._id, p));
+        
+        const index = matches.value.findIndex(m => m._id === updatedMatch._id);
+        if (index !== -1) {
+            matches.value[index] = updatedMatch;
+        }
+        selectedMatch.value = updatedMatch;
+        newEvent.value = { type: 'goal', teamId: null, playerId: null, minute: '' };
+    } catch (err) {
+        eventsModalError.value = err.response?.data?.message || 'Failed to add event.';
+    } finally {
+        isSubmittingEvent.value = false;
+    }
+};
+
+const handleDeleteEvent = async (matchId, eventId) => {
+    try {
+        const response = await apiClient.delete(`/api/matches/${matchId}/events/${eventId}`);
+        const updatedMatch = response.data.match;
+        
+        const index = matches.value.findIndex(m => m._id === updatedMatch._id);
+        if (index !== -1) {
+            matches.value[index] = updatedMatch;
+        }
+        selectedMatch.value = updatedMatch;
+    } catch (err) {
+        eventsModalError.value = err.response?.data?.message || 'Failed to delete event.';
+    }
 };
 
 const deleteMatch = async (matchId) => {
@@ -136,49 +222,6 @@ const deleteMatch = async (matchId) => {
   }
 };
 
-const formatMatchDate = (dateString) => {
-  if (!dateString) return 'N/A';
-  const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
-  return new Date(dateString).toLocaleString('en-US', options);
-};
-
-const openScoreModal = (match) => {
-    closeMenu();
-    selectedMatch.value = match;
-    score.value.teamA = match.score.teamA ?? 0;
-    score.value.teamB = match.score.teamB ?? 0;
-    scoreModalError.value = '';
-    showScoreModal.value = true;
-};
-
-const closeScoreModal = () => {
-    showScoreModal.value = false;
-    selectedMatch.value = null;
-};
-
-const submitScoreUpdate = async () => {
-    isUpdatingScore.value = true;
-    scoreModalError.value = '';
-    try {
-        const response = await apiClient.put(`/api/matches/${selectedMatch.value._id}`, {
-            scoreA: score.value.teamA,
-            scoreB: score.value.teamB
-        });
-        
-        const index = matches.value.findIndex(m => m._id === selectedMatch.value._id);
-        if (index !== -1) {
-            matches.value[index] = response.data.match;
-        }
-        closeScoreModal();
-        emit('feedback', { type: 'success', text: 'Score updated successfully!' });
-    } catch (err) {
-        console.error("Failed to update score:", err);
-        scoreModalError.value = err.response?.data?.message || 'Failed to update score.';
-    } finally {
-        isUpdatingScore.value = false;
-    }
-};
-
 const finishMatch = async (matchId) => {
     closeMenu();
     if (!confirm("Are you sure you want to finalize this match? The result cannot be edited after this.")) {
@@ -188,7 +231,7 @@ const finishMatch = async (matchId) => {
         const response = await apiClient.patch(`/api/matches/${matchId}/finish`);
         const index = matches.value.findIndex(m => m._id === matchId);
         if (index !== -1) {
-            matches.value[index] = response.data.match; // Update the whole match
+            matches.value[index] = response.data.match; 
         }
         emit('feedback', { type: 'success', text: 'Match marked as finished!' });
     } catch (err) {
@@ -206,9 +249,7 @@ onUnmounted(() => {
   window.removeEventListener('click', closeMenu);
 });
 
-defineExpose({
-    fetchMatches
-});
+defineExpose({ fetchMatches });
 </script>
 
 <style scoped>
@@ -292,11 +333,6 @@ defineExpose({
 .match-score {
   font-size: 1.25rem;
   padding: 0 1rem;
-}
-
-.clickable-score {
-  cursor: pointer;
-  border-bottom: 2px dotted #00AEEF;
 }
 
 .match-meta {
@@ -402,6 +438,40 @@ defineExpose({
   color: #dc3545;
 }
 
+.error-message {
+  color: #dc3545;
+  text-align: center;
+  margin-top: 1rem;
+}
+
+.event-timeline {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 0.75rem 0 0.25rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.event-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.event-item .fa-futbol {
+  color: #28a745;
+}
+
+.event-item .yellow-card {
+  color: #ffc107;
+}
+
+.event-item .red-card {
+  color: #dc3545;
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -420,7 +490,10 @@ defineExpose({
   padding: 2rem;
   border-radius: 12px;
   width: 90%;
-  max-width: 400px;
+}
+
+.modal-content.large {
+  max-width: 600px;
 }
 
 .modal-content h3 {
@@ -429,34 +502,15 @@ defineExpose({
 
 .modal-content p {
   color: #666;
-}
-
-.score-input-group {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin: 2rem 0;
-}
-
-.score-input-group input {
-  width: 80px;
-  padding: 0.75rem;
-  font-size: 1.5rem;
   text-align: center;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-}
-
-.score-input-group span {
-  font-size: 1.5rem;
-  font-weight: bold;
+  margin-bottom: 2rem;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
+  margin-top: 1.5rem;
 }
 
 .btn-cancel,
@@ -483,13 +537,66 @@ defineExpose({
   color: white;
 }
 
+.btn-submit.small {
+  padding: 0.5rem 1rem;
+  font-weight: normal;
+}
+
 .btn-submit:disabled {
   background-color: #a0a0a0;
 }
 
-.error-message {
-  color: #dc3545;
+.event-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 80px auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.event-form select,
+.event-form input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.event-form input {
   text-align: center;
-  margin-top: 1rem;
+}
+
+.existing-events-list {
+  margin-top: 2rem;
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.existing-event-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.existing-event-item:last-child {
+  border-bottom: none;
+}
+
+.btn-delete-event {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.btn-delete-event:hover {
+  color: #dc3545;
 }
 </style>
