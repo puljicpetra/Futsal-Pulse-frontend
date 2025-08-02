@@ -73,12 +73,11 @@
         </div>
         
         <aside class="sidebar-content">
-           <MatchList 
-            ref="matchListComp"
+           <MatchListSummary 
+            ref="matchListSummaryComp"
             :tournamentId="tournament._id"
             :isOwner="isOwner"
             @add-match="openAddMatchModal"
-            @feedback="showFeedback"
            />
         </aside>
       </main>
@@ -116,6 +115,7 @@
     <div v-if="showAddMatchModal" class="modal-overlay" @click.self="closeAddMatchModal">
       <div class="modal-content">
         <h3>Add a New Match</h3>
+        <p>This will add a match to the full schedule. You can manage events on the "All Matches" page.</p>
         <form @submit.prevent="submitNewMatch">
           <div class="form-group">
             <label for="teamA">Team A</label>
@@ -162,8 +162,8 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
-import TeamList from '../components/TeamList.vue';
-import MatchList from '../components/MatchList.vue';
+import TeamList from '@/components/TeamList.vue';
+import MatchListSummary from '@/components/MatchListSummary.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -196,7 +196,7 @@ const newMatch = ref({
 });
 
 const teamListComp = ref(null);
-const matchListComp = ref(null);
+const matchListSummaryComp = ref(null);
 
 const isOwner = computed(() => {
   if (!authStore.isLoggedIn || !tournament.value) return false;
@@ -319,8 +319,9 @@ const submitNewMatch = async () => {
     try {
         await apiClient.post('/api/matches', newMatch.value);
         closeAddMatchModal();
-        if (matchListComp.value) {
-          matchListComp.value.fetchMatches();
+        showFeedback({ type: 'success', text: 'Match added successfully!' });
+        if (matchListSummaryComp.value) {
+          matchListSummaryComp.value.fetchMatchesSummary();
         }
     } catch(err) {
         matchModalError.value = err.response?.data?.message || 'Failed to create match.';

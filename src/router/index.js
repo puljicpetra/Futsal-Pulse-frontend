@@ -12,6 +12,7 @@ import EditTournament from '@/views/EditTournament.vue';
 import CreateTeam from '@/views/CreateTeam.vue';
 import TeamDetail from '@/views/TeamDetail.vue';
 import MyInvitations from '@/views/MyInvitations.vue';
+import TournamentMatches from '@/views/TournamentMatches.vue';
 
 const routes = [
   {
@@ -46,6 +47,12 @@ const routes = [
     path: '/tournaments/:id',
     name: 'TournamentDetail',
     component: TournamentDetail,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/tournaments/:id/matches',
+    name: 'TournamentMatches',
+    component: TournamentMatches,
     meta: { requiresAuth: true }
   },
   {
@@ -89,6 +96,11 @@ const routes = [
     name: 'MyInvitations',
     component: MyInvitations,
     meta: { requiresAuth: true }
+  },
+  { 
+    path: '/:pathMatch(.*)*', 
+    name: 'NotFound',
+    component: () => import('@/views/NotFound.vue')
   }
 ];
 
@@ -99,15 +111,12 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token');
-
   if (to.meta.requiresAuth && !token) {
     next('/login');
   }
-
   else if ((to.path === '/login' || to.path === '/register') && token) {
     next('/');
   }
-
   else {
     next();
   }
