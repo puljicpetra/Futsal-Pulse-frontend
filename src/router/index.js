@@ -13,6 +13,7 @@ import CreateTeam from '@/views/CreateTeam.vue';
 import TeamDetail from '@/views/TeamDetail.vue';
 import MyInvitations from '@/views/MyInvitations.vue';
 import TournamentMatches from '@/views/TournamentMatches.vue';
+import MatchDetail from '@/views/MatchDetail.vue';
 
 const routes = [
   {
@@ -65,6 +66,12 @@ const routes = [
     path: '/matches',
     name: 'Matches',
     component: Matches,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/matches/:id',
+    name: 'MatchDetail',
+    component: MatchDetail,
     meta: { requiresAuth: true }
   },
   {

@@ -27,7 +27,7 @@
     </ul>
 
     <div class="footer-actions">
-        <router-link :to="`/tournaments/${tournamentId}/matches`" class="btn-see-all">
+        <router-link :to="`/matches?tournamentId=${tournamentId}`" class="btn-see-all">
             See All Matches
         </router-link>
     </div>

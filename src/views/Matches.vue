@@ -9,8 +9,18 @@
     <div class="page-content">
       <div class="filters-container">
         <div class="filter-group">
-          <label for="team-filter"><i class="fas fa-shield-alt"></i> Filter by Team Name</label>
-          <input type="text" id="team-filter" v-model="filters.teamName" @keyup.enter="applyFilters" placeholder="e.g., Dinamo" />
+          <label for="tournament-filter"><i class="fas fa-trophy"></i> Filter by Tournament</label>
+          <select id="tournament-filter" v-model="filters.tournamentId">
+            <option :value="null">All Tournaments</option>
+            <option v-for="t in allTournaments" :key="t._id" :value="t._id">{{ t.name }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="team-filter"><i class="fas fa-shield-alt"></i> Filter by Team</label>
+          <select id="team-filter" v-model="filters.teamId">
+            <option :value="null">All Teams</option>
+            <option v-for="t in allTeams" :key="t._id" :value="t._id">{{ t.name }}</option>
+          </select>
         </div>
         <div class="filter-actions">
           <button @click="applyFilters" class="btn-filter">
@@ -33,30 +43,30 @@
         <button @click="fetchMatches" class="btn-retry">Try Again</button>
       </div>
 
-      <div v-else-if="filteredAndGroupedMatches.length > 0">
-        <div v-for="group in filteredAndGroupedMatches" :key="group.date" class="date-group">
+      <div v-else-if="groupedMatches.length > 0">
+        <div v-for="group in groupedMatches" :key="group.date" class="date-group">
           <h3 class="date-header">{{ formatDateGroup(group.date) }}</h3>
           <div class="matches-list">
-            <div v-for="match in group.matches" :key="match._id" class="match-card">
-              <div class="match-card-header">
-                <router-link :to="`/tournaments/${match.tournament._id}`" class="tournament-link">
-                  {{ match.tournament.name }}
-                </router-link>
-                <span v-if="match.group" class="group-badge">{{ match.group }}</span>
+            <router-link v-for="match in group.matches" :key="match._id" :to="`/matches/${match._id}`" class="match-card-link">
+              <div class="match-card">
+                <div class="match-card-header">
+                  <span class="tournament-name">{{ match.tournament.name }}</span>
+                  <span v-if="match.group" class="group-badge">{{ match.group }}</span>
+                </div>
+                <div class="match-card-body">
+                  <div class="team-info team-a">
+                    <span class="team-name">{{ match.teamA.name }}</span>
+                  </div>
+                  <div class="score-info">
+                    <span class="score">{{ match.score.teamA ?? '-' }} : {{ match.score.teamB ?? '-' }}</span>
+                    <span class="match-time">{{ formatTime(match.matchDate) }}</span>
+                  </div>
+                  <div class="team-info team-b">
+                    <span class="team-name">{{ match.teamB.name }}</span>
+                  </div>
+                </div>
               </div>
-              <div class="match-card-body">
-                <div class="team-info team-a">
-                  <span class="team-name">{{ match.teamA.name }}</span>
-                </div>
-                <div class="score-info">
-                  <span class="score">{{ match.score.teamA ?? '-' }} : {{ match.score.teamB ?? '-' }}</span>
-                  <span class="match-time">{{ formatTime(match.matchDate) }}</span>
-                </div>
-                <div class="team-info team-b">
-                  <span class="team-name">{{ match.teamB.name }}</span>
-                </div>
-              </div>
-            </div>
+            </router-link>
           </div>
         </div>
       </div>
@@ -65,7 +75,7 @@
         <div class="empty-state-icon"><i class="fas fa-calendar-times"></i></div>
         <h2>No Matches Found</h2>
         <p>There are no matches scheduled or your filters did not return any results.</p>
-        <button v-if="filters.teamName" @click="clearFilters" class="btn-clear-main">Clear Filters</button>
+        <button v-if="filters.tournamentId || filters.teamId" @click="clearFilters" class="btn-clear-main">Clear Filters</button>
       </div>
     </div>
   </div>
@@ -73,21 +83,33 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { useRoute } from 'vue-router';
 import apiClient from '@/services/api';
 
+const route = useRoute();
 const allMatches = ref([]);
+const allTournaments = ref([]);
+const allTeams = ref([]);
 const isLoading = ref(true);
 const error = ref('');
 
 const filters = ref({
-  teamName: ''
+  tournamentId: null,
+  teamId: null
 });
 
 const fetchMatches = async () => {
   isLoading.value = true;
   error.value = '';
   try {
-    const response = await apiClient.get('/api/matches');
+    const params = new URLSearchParams();
+    if (filters.value.tournamentId) {
+        params.append('tournamentId', filters.value.tournamentId);
+    }
+    if (filters.value.teamId) {
+        params.append('teamId', filters.value.teamId);
+    }
+    const response = await apiClient.get(`/api/matches?${params.toString()}`);
     allMatches.value = response.data;
   } catch (err) {
     error.value = err.response?.data?.message || 'Failed to fetch matches.';
@@ -96,18 +118,21 @@ const fetchMatches = async () => {
   }
 };
 
-const filteredAndGroupedMatches = computed(() => {
-  let filtered = allMatches.value;
+const fetchFilterData = async () => {
+    try {
+        const [tournamentsRes, teamsRes] = await Promise.all([
+            apiClient.get('/api/tournaments'),
+            apiClient.get('/api/teams')
+        ]);
+        allTournaments.value = tournamentsRes.data;
+        allTeams.value = teamsRes.data;
+    } catch (err) {
+        console.error("Failed to load filter data:", err);
+    }
+};
 
-  if (filters.value.teamName) {
-    const query = filters.value.teamName.toLowerCase();
-    filtered = allMatches.value.filter(match => 
-      match.teamA?.name.toLowerCase().includes(query) || 
-      match.teamB?.name.toLowerCase().includes(query)
-    );
-  }
-
-  const groups = filtered.reduce((acc, match) => {
+const groupedMatches = computed(() => {
+  const groups = allMatches.value.reduce((acc, match) => {
     const date = match.matchDate.split('T')[0];
     if (!acc[date]) {
       acc[date] = [];
@@ -123,10 +148,13 @@ const filteredAndGroupedMatches = computed(() => {
 });
 
 const applyFilters = () => {
+    fetchMatches();
 };
 
 const clearFilters = () => {
-  filters.value.teamName = '';
+  filters.value.tournamentId = null;
+  filters.value.teamId = null;
+  fetchMatches();
 };
 
 const formatDateGroup = (dateString) => {
@@ -139,7 +167,13 @@ const formatTime = (dateString) => {
   return new Date(dateString).toLocaleTimeString('en-US', options);
 };
 
-onMounted(fetchMatches);
+onMounted(() => {
+    if (route.query.tournamentId) {
+        filters.value.tournamentId = route.query.tournamentId;
+    }
+    fetchMatches();
+    fetchFilterData();
+});
 </script>
 
 <style scoped>
@@ -181,9 +215,10 @@ h1 {
   border-radius: 12px;
   margin-bottom: 2rem;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
   align-items: flex-end;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .filter-group {
@@ -195,14 +230,22 @@ h1 {
   color: #374151;
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.filter-group input {
+.filter-group select {
   width: 100%;
   padding: 0.75rem;
   border: 1px solid #d1d5db;
   border-radius: 8px;
+  background-color: #fff;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .filter-actions button {
@@ -211,6 +254,9 @@ h1 {
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .btn-filter {
@@ -241,6 +287,11 @@ h1 {
   gap: 1rem;
 }
 
+.match-card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
 .match-card {
   background-color: #fff;
   border-radius: 8px;
@@ -263,14 +314,9 @@ h1 {
   font-size: 0.9rem;
 }
 
-.tournament-link {
+.tournament-name {
   color: #4b5563;
   font-weight: 600;
-  text-decoration: none;
-}
-
-.tournament-link:hover {
-  color: #00AEEF;
 }
 
 .group-badge {
