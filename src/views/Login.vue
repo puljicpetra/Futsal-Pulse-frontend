@@ -1,64 +1,52 @@
 <template>
-  <div class="login-wrapper">
-    <div class="glass-container">
-      <div class="login-box">
-        <h2>Login</h2>
-        <form @submit.prevent="login">
-          <input
-            type="text"
-            v-model="username"
-            placeholder="Username"
-            required
-          />
+    <div class="login-wrapper">
+        <div class="glass-container">
+            <div class="login-box">
+                <h2>Login</h2>
+                <form @submit.prevent="login">
+                    <input type="text" v-model="username" placeholder="Username" required />
 
-          <input
-            type="password"
-            v-model="password"
-            placeholder="Password"
-            required
-          />
+                    <input type="password" v-model="password" placeholder="Password" required />
 
-          <button type="submit" :disabled="isLoggingIn">
-            {{ isLoggingIn ? 'Logging in...' : 'Login' }}
-          </button>
+                    <button type="submit" :disabled="isLoggingIn">
+                        {{ isLoggingIn ? 'Logging in...' : 'Login' }}
+                    </button>
 
-          <p>
-            Don't have an account?
-            <router-link id="register" to="/register">Register</router-link>
-          </p>
+                    <p>
+                        Don't have an account?
+                        <router-link id="register" to="/register">Register</router-link>
+                    </p>
 
-          <p v-if="error" class="error-message">{{ error }}</p>
-        </form>
-      </div>
+                    <p v-if="error" class="error-message">{{ error }}</p>
+                </form>
+            </div>
+        </div>
     </div>
-  </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useAuthStore } from '@/stores/auth';
+import { ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 
-const authStore = useAuthStore();
-const username = ref('');
-const password = ref('');
-const error = ref('');
-const isLoggingIn = ref(false);
-
+const authStore = useAuthStore()
+const username = ref('')
+const password = ref('')
+const error = ref('')
+const isLoggingIn = ref(false)
 
 async function login() {
-  if (isLoggingIn.value) return;
+    if (isLoggingIn.value) return
 
-  isLoggingIn.value = true;
-  error.value = '';
+    isLoggingIn.value = true
+    error.value = ''
 
-  try {
-    await authStore.login(username.value, password.value);
-
-  } catch (err) {
-    error.value = 'Invalid login credentials. Please try again.';
-  } finally {
-    isLoggingIn.value = false;
-  }
+    try {
+        await authStore.login(username.value, password.value)
+    } catch (err) {
+        error.value = 'Invalid login credentials. Please try again.'
+    } finally {
+        isLoggingIn.value = false
+    }
 }
 </script>
 
@@ -69,8 +57,8 @@ async function login() {
     margin: 0;
     box-sizing: border-box;
     font-family: 'Poppins', sans-serif;
-  }
-  
+}
+
 .login-wrapper {
     height: 100vh;
     background-image: url('@/assets/LoginBackground.jpg');
@@ -81,7 +69,7 @@ async function login() {
     justify-content: center;
     align-items: center;
 }
-  
+
 .glass-container {
     width: 300px;
     height: 350px;
@@ -92,7 +80,7 @@ async function login() {
     border-radius: 10px;
     border: 1px solid #fff;
 }
-  
+
 .glass-container::before {
     content: '';
     position: absolute;
@@ -103,25 +91,25 @@ async function login() {
     -webkit-backdrop-filter: blur(5px);
     z-index: -1;
 }
-  
+
 .login-box {
     max-width: 250px;
     margin: 0 auto;
     text-align: center;
 }
-  
+
 h2 {
     color: #fff;
     margin-top: 30px;
     margin-bottom: -20px;
 }
-  
+
 form {
     display: flex;
     flex-direction: column;
     margin-top: 20px;
 }
-  
+
 input {
     padding: 10px;
     margin-top: 25px;
@@ -132,15 +120,15 @@ input {
     color: #fff;
     font-size: 13px;
 }
-  
+
 input::placeholder {
     color: #fff;
 }
-  
+
 input:focus {
     outline: none;
 }
-  
+
 button {
     background: #fff;
     color: black;
@@ -150,7 +138,7 @@ button {
     cursor: pointer;
     margin-top: 15px;
 }
-  
+
 button:hover {
     background: transparent;
     color: white;
@@ -158,23 +146,23 @@ button:hover {
 }
 
 button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
+    background-color: #ccc;
+    cursor: not-allowed;
 }
-  
+
 p {
     font-size: 12px;
     color: #fff;
     margin-top: 15px;
 }
-  
+
 #error,
 .error-message {
     color: red;
     font-size: 12px;
     margin-top: 5px;
 }
-  
+
 #register {
     text-decoration: none;
     color: #fff;
