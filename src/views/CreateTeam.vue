@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import apiClient from '@/services/api';
 import { useRouter } from 'vue-router';
 
@@ -43,27 +43,44 @@ const teamName = ref('');
 const isSubmitting = ref(false);
 const error = ref('');
 const success = ref('');
+let redirectTimer = null;
 
 const submitTeam = async () => {
   isSubmitting.value = true;
   error.value = '';
   success.value = '';
 
+  const cleanedName = teamName.value.trim().replace(/\s+/g, ' ');
+  if (cleanedName.length < 2 || cleanedName.length > 50) {
+    error.value = 'Team name must be between 2 and 50 characters.';
+    isSubmitting.value = false;
+    return;
+  }
+
   try {
-    const response = await apiClient.post('/api/teams', { name: teamName.value });
-    
-    success.value = response.data.message;
-    
-    setTimeout(() => {
+    const { data } = await apiClient.post('/api/teams', { name: cleanedName });
+
+    success.value = data?.message || 'Team created successfully.';
+    redirectTimer = setTimeout(() => {
       router.push('/teams');
     }, 1500);
-
   } catch (err) {
-    error.value = err.response?.data?.message || 'Failed to create team. Please try again.';
+    const status = err.response?.status;
+    if (status === 401) {
+      error.value = 'You need to be logged in to create a team.';
+    } else if (status === 409) {
+      error.value = err.response?.data?.message || 'A team with that name already exists.';
+    } else {
+      error.value = err.response?.data?.message || 'Failed to create team. Please try again.';
+    }
   } finally {
     isSubmitting.value = false;
   }
 };
+
+onUnmounted(() => {
+  if (redirectTimer) clearTimeout(redirectTimer);
+});
 </script>
 
 <style scoped>

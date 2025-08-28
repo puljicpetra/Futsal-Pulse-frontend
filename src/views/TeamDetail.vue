@@ -45,9 +45,13 @@
                    </div>
                 </div>
                 <div class="player-actions">
-                    <i v-if="player._id === team.captain._id" class="fas fa-crown captain-icon" title="Team Captain"></i>
+                    <i
+                      v-if="isTeamCaptain(player._id)"
+                      class="fas fa-crown captain-icon"
+                      title="Team Captain"
+                    ></i>
                     <button 
-                      v-if="isCaptain && player._id !== team.captain._id" 
+                      v-if="isCaptain && !isTeamCaptain(player._id)" 
                       @click="removePlayer(player._id, player.username)"
                       class="btn-remove-player"
                       title="Remove player"
@@ -164,10 +168,20 @@ const inviteMessage = ref({ type: '', text: '' });
 
 const removePlayerMessage = ref({ type: '', text: '' });
 
+const oidString = (v) =>
+  typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null);
+const idEq = (a, b) => {
+  const sa = oidString(a);
+  const sb = oidString(b);
+  return !!sa && !!sb && sa === sb;
+};
+
 const isCaptain = computed(() => {
-  if (!authStore.isLoggedIn || !team.value || !team.value.captain) return false;
-  return authStore.userId === team.value.captain._id;
+  if (!authStore.isLoggedIn || !team.value) return false;
+  return idEq(authStore.userId, team.value.captain?._id ?? team.value.captain);
 });
+
+const isTeamCaptain = (userId) => idEq(userId, team.value?.captain?._id ?? team.value?.captain);
 
 const fetchTeamDetails = async () => {
   isLoading.value = true;
@@ -198,9 +212,9 @@ const searchPlayers = async () => {
     const response = await apiClient.get('/api/users/search', {
       params: { query: searchQuery.value }
     });
-    const existingPlayerIds = team.value.players.map(p => p._id);
-    searchResults.value = response.data
-      .filter(player => !existingPlayerIds.includes(player._id))
+    const existingIds = new Set((team.value?.players ?? []).map(p => oidString(p._id)));
+    searchResults.value = (response.data || [])
+      .filter(player => !existingIds.has(oidString(player._id)))
       .map(player => ({ ...player, inviteStatus: 'idle' }));
   } catch (err) {
     searchError.value = err.response?.data?.message || 'Error searching for players.';
@@ -213,22 +227,17 @@ const invitePlayer = async (playerId, playerUsername) => {
   invitingPlayerId.value = playerId;
   inviteMessage.value = { type: '', text: '' };
   try {
-    await apiClient.post(`/api/teams/${teamId}/invites`, {
-      playerId: playerId
-    });
+    await apiClient.post(`/api/teams/${teamId}/invites`, { playerId });
     inviteMessage.value = { type: 'success', text: `Successfully invited ${playerUsername}!` };
-    
-    const playerIndex = searchResults.value.findIndex(p => p._id === playerId);
+    const playerIndex = searchResults.value.findIndex(p => idEq(p._id, playerId));
     if (playerIndex > -1) {
       searchResults.value.splice(playerIndex, 1);
     }
-    
   } catch (err) {
     const errorMessage = err.response?.data?.message || 'Failed to send invitation.';
     inviteMessage.value = { type: 'error', text: errorMessage };
-    
-    if (errorMessage.toLowerCase().includes('already been invited')) {
-      const playerIndex = searchResults.value.findIndex(p => p._id === playerId);
+    if (/already been invited/i.test(errorMessage)) {
+      const playerIndex = searchResults.value.findIndex(p => idEq(p._id, playerId));
       if (playerIndex > -1) {
         searchResults.value[playerIndex].inviteStatus = 'pending';
       }
@@ -243,39 +252,35 @@ const removePlayer = async (playerId, playerUsername) => {
     removePlayerMessage.value = { type: '', text: '' };
     try {
       await apiClient.delete(`/api/teams/${teamId}/players/${playerId}`);
-      
       if (team.value) {
-        team.value.players = team.value.players.filter(p => p._id !== playerId);
+        team.value.players = team.value.players.filter(p => !idEq(p._id, playerId));
       }
-
       removePlayerMessage.value = { type: 'success', text: `${playerUsername} has been removed.` };
-
     } catch (err) {
       removePlayerMessage.value = { type: 'error', text: err.response?.data?.message || 'Failed to remove player.' };
     } finally {
-        setTimeout(() => {
-            removePlayerMessage.value = { type: '', text: '' };
-        }, 3000);
+      setTimeout(() => {
+        removePlayerMessage.value = { type: '', text: '' };
+      }, 3000);
     }
   }
 };
 
 const deleteTeam = async () => {
-    const teamName = team.value.name;
-    if (window.confirm(`Are you sure you want to permanently delete the team "${teamName}"? This action cannot be undone.`)) {
-        try {
-            await apiClient.delete(`/api/teams/${teamId}`);
-            alert(`Team "${teamName}" has been deleted.`);
-            router.push('/teams');
-        } catch(err) {
-             removePlayerMessage.value = { type: 'error', text: err.response?.data?.message || 'Failed to delete the team.' };
-             setTimeout(() => {
-                removePlayerMessage.value = { type: '', text: '' };
-            }, 4000);
-        }
+  const teamName = team.value.name;
+  if (window.confirm(`Are you sure you want to permanently delete the team "${teamName}"? This action cannot be undone.`)) {
+    try {
+      await apiClient.delete(`/api/teams/${teamId}`);
+      alert(`Team "${teamName}" has been deleted.`);
+      router.push('/teams');
+    } catch (err) {
+      removePlayerMessage.value = { type: 'error', text: err.response?.data?.message || 'Failed to delete the team.' };
+      setTimeout(() => {
+        removePlayerMessage.value = { type: '', text: '' };
+      }, 4000);
     }
-}
-
+  }
+};
 
 onMounted(() => {
   fetchTeamDetails();

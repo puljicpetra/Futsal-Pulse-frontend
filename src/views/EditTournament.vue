@@ -27,17 +27,17 @@
         
         <div class="form-group">
           <label for="name">Tournament Name</label>
-          <input type="text" id="name" v-model="tournament.name" required />
+          <input type="text" id="name" v-model.trim="tournament.name" required />
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label for="city">City</label>
-            <input type="text" id="city" v-model="tournament.location.city" required />
+            <input type="text" id="city" v-model.trim="tournament.location.city" required />
           </div>
           <div class="form-group">
             <label for="venue">Venue / Sports Hall</label>
-            <input type="text" id="venue" v-model="tournament.location.venue" />
+            <input type="text" id="venue" v-model.trim="tournament.location.venue" />
           </div>
         </div>
 
@@ -48,9 +48,15 @@
             </div>
             <div class="form-group">
               <label for="endDate">End Date (optional)</label>
-              <input type="date" id="endDate" v-model="formattedEndDate" />
+              <input
+                type="date"
+                id="endDate"
+                v-model="formattedEndDate"
+                :min="formattedStartDate || null"
+              />
             </div>
         </div>
+        <p v-if="dateError" class="error-message" style="margin-top:-0.5rem">{{ dateError }}</p>
 
         <div class="form-group">
           <label for="surface">Playing Surface</label>
@@ -66,7 +72,7 @@
 
         <div class="form-group">
           <label for="rules">Rules & Description</label>
-          <textarea id="rules" v-model="tournament.rules" rows="6"></textarea>
+          <textarea id="rules" v-model.trim="tournament.rules" rows="6"></textarea>
         </div>
 
         <div class="form-group">
@@ -75,18 +81,25 @@
             <img :src="getImageUrl(tournament.imageUrl)" alt="Current image" />
             <span>Current Image</span>
           </div>
-           <div class="current-image-preview" v-if="newImagePreviewUrl">
+          <div class="current-image-preview" v-if="newImagePreviewUrl">
             <img :src="newImagePreviewUrl" alt="New image preview" />
             <span>New Image Preview</span>
           </div>
-          <input type="file" id="tournamentImage" @change="handleFileChange" class="file-input" accept="image/png, image/jpeg" />
+          <input
+            type="file"
+            id="tournamentImage"
+            @change="handleFileChange"
+            class="file-input"
+            accept="image/png, image/jpeg"
+          />
+          <p v-if="fileError" class="error-message" style="margin-top:0.5rem">{{ fileError }}</p>
         </div>
         
         <div class="form-actions">
             <p v-if="updateError" class="error-message">{{ updateError }}</p>
             <p v-if="updateSuccess" class="success-message">{{ updateSuccess }}</p>
 
-            <button type="submit" class="btn-submit" :disabled="isSubmitting">
+            <button type="submit" class="btn-submit" :disabled="isSubmitting || !isFormValid">
               <span v-if="isSubmitting" class="spinner-sm"></span>
               {{ isSubmitting ? 'Saving...' : 'Save Changes' }}
             </button>
@@ -97,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import apiClient from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
@@ -118,9 +131,17 @@ const isSubmitting = ref(false);
 const updateError = ref('');
 const updateSuccess = ref('');
 
+const dateError = ref('');
+const fileError = ref('');
+
+const MAX_MB = 5;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png'];
+
 const formatDateForInput = (dateString) => {
   if (!dateString) return '';
-  return new Date(dateString).toISOString().split('T')[0];
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().split('T')[0];
 };
 
 const formattedStartDate = computed({
@@ -132,13 +153,47 @@ const formattedEndDate = computed({
   set: (newValue) => { tournament.value.endDate = newValue; }
 });
 
+const toDate = (yyyy_mm_dd) => {
+  if (!yyyy_mm_dd) return null;
+  const [y, m, d] = yyyy_mm_dd.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+};
+
+watch(
+  () => [formattedStartDate.value, formattedEndDate.value],
+  () => {
+    dateError.value = '';
+    const s = toDate(formattedStartDate.value);
+    const e = toDate(formattedEndDate.value);
+    if (s && e && e < s) {
+      dateError.value = 'End date cannot be before start date.';
+    }
+  },
+  { immediate: true }
+);
+
+const isFormValid = computed(() => {
+  if (!tournament.value?.name?.trim()) return false;
+  if (!tournament.value?.location?.city?.trim()) return false;
+  if (!formattedStartDate.value) return false;
+  if (!tournament.value?.surface) return false;
+  if (dateError.value) return false;
+  if (fileError.value) return false;
+  return true;
+});
+
+const normalizeOrganizerId = (data) =>
+  data?.organizer?._id || data?.organizer || data?.organizerInfo?._id || null;
+
 const fetchTournamentData = async () => {
   try {
     const response = await apiClient.get(`/api/tournaments/${tournamentId}`);
 
-    if (response.data.organizer !== authStore.userId) {
+    const orgId = normalizeOrganizerId(response.data);
+    if (orgId && orgId !== authStore.userId) {
       error.value = "You do not have permission to edit this tournament.";
-      setTimeout(() => router.push(`/tournaments/${tournamentId}`), 3000);
+      setTimeout(() => router.push(`/tournaments/${tournamentId}`), 2500);
       return;
     }
     
@@ -151,44 +206,71 @@ const fetchTournamentData = async () => {
   }
 };
 
-const handleFileChange = (event) => {
-  const file = event.target.files[0];
-  if (file) {
-    newImageFile.value = file;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      newImagePreviewUrl.value = e.target.result;
-    };
-    reader.readAsDataURL(file);
+const revokePreview = () => {
+  if (newImagePreviewUrl.value) {
+    URL.revokeObjectURL(newImagePreviewUrl.value);
+    newImagePreviewUrl.value = null;
   }
 };
 
+const handleFileChange = (event) => {
+  fileError.value = '';
+  const file = event.target.files?.[0];
+  revokePreview();
+
+  if (!file) {
+    newImageFile.value = null;
+    return;
+  }
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    fileError.value = 'Only JPG and PNG files are allowed.';
+    newImageFile.value = null;
+    event.target.value = '';
+    return;
+  }
+  const sizeMb = file.size / (1024 * 1024);
+  if (sizeMb > MAX_MB) {
+    fileError.value = `Image is too large (${sizeMb.toFixed(1)} MB). Max ${MAX_MB} MB.`;
+    newImageFile.value = null;
+    event.target.value = '';
+    return;
+  }
+
+  newImageFile.value = file;
+  newImagePreviewUrl.value = URL.createObjectURL(file);
+};
+
+onBeforeUnmount(() => revokePreview());
+
 const submitUpdate = async () => {
+  if (!isFormValid.value) return;
+
   isSubmitting.value = true;
   updateError.value = '';
   updateSuccess.value = '';
 
   const formData = new FormData();
-  formData.append('name', tournament.value.name);
-  formData.append('location', JSON.stringify(tournament.value.location));
-  formData.append('startDate', tournament.value.startDate);
-  if(tournament.value.endDate) formData.append('endDate', tournament.value.endDate);
+  formData.append('name', tournament.value.name.trim());
+  formData.append('location', JSON.stringify({
+    city: (tournament.value.location.city || '').trim(),
+    venue: (tournament.value.location.venue || '').trim()
+  }));
+  formData.append('startDate', formattedStartDate.value);
+  if (formattedEndDate.value) formData.append('endDate', formattedEndDate.value);
   formData.append('surface', tournament.value.surface);
-  formData.append('rules', tournament.value.rules);
+  formData.append('rules', tournament.value.rules?.trim() || '');
 
   if (newImageFile.value) {
     formData.append('tournamentImage', newImageFile.value);
   }
 
   try {
-    const response = await apiClient.put(`/api/tournaments/${tournamentId}`, formData, {
-      headers: { 'Content-Type': undefined }
-    });
+    const response = await apiClient.put(`/api/tournaments/${tournamentId}`, formData);
     
     updateSuccess.value = 'Tournament updated successfully!';
     tournament.value = response.data;
     newImageFile.value = null;
-    newImagePreviewUrl.value = null;
+    revokePreview();
 
     setTimeout(() => {
       updateSuccess.value = '';
@@ -196,13 +278,13 @@ const submitUpdate = async () => {
 
   } catch (err) {
     if (err.response?.data) {
-        if (Array.isArray(err.response.data.errors)) {
-             updateError.value = err.response.data.errors.map(e => e.msg).join(' ');
-        } else if (err.response.data.message) {
-            updateError.value = err.response.data.message;
-        } else {
-            updateError.value = 'An unknown error occurred while saving.';
-        }
+      if (Array.isArray(err.response.data.errors)) {
+        updateError.value = err.response.data.errors.map(e => e.msg).join(' ');
+      } else if (err.response.data.message) {
+        updateError.value = err.response.data.message;
+      } else {
+        updateError.value = 'An unknown error occurred while saving.';
+      }
     } else {
       updateError.value = 'Failed to update tournament. Please try again.';
     }

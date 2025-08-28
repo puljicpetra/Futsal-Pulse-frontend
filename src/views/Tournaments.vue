@@ -71,7 +71,9 @@
           
           <div class="card-header">
             <h3>{{ tournament.name }}</h3>
-            <span class="surface-badge" :class="`surface-${tournament.surface}`">{{ tournament.surface }}</span>
+            <span class="surface-badge" :class="`surface-${normalizeSurface(tournament.surface)}`">
+              {{ tournament.surface }}
+            </span>
           </div>
           <div class="card-body">
             <div class="card-info">
@@ -111,19 +113,20 @@ const filters = ref({
   surface: ''
 });
 
+const normalizeSurface = (s = '') =>
+  s.toString().toLowerCase().trim().replace(/\s+/g, '-');
+
 const fetchTournaments = async () => {
   isLoading.value = true;
   error.value = '';
   try {
     const params = new URLSearchParams();
-    if (filters.value.city) {
-      params.append('city', filters.value.city.trim());
-    }
-    if (filters.value.surface) {
-      params.append('surface', filters.value.surface);
-    }
-    const response = await apiClient.get(`/api/tournaments?${params.toString()}`);
-    tournaments.value = response.data;
+    if (filters.value.city) params.append('city', filters.value.city.trim());
+    if (filters.value.surface) params.append('surface', filters.value.surface);
+
+    const qs = params.toString();
+    const { data } = await apiClient.get(`/api/tournaments${qs ? `?${qs}` : ''}`);
+    tournaments.value = data;
   } catch (err) {
     error.value = err.response?.data?.message || 'Failed to fetch tournaments.';
   } finally {
@@ -144,7 +147,8 @@ const clearFilters = () => {
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  return new Date(dateString).toLocaleDateString('en-US', options);
+  const locale = navigator.language || undefined;
+  return new Date(dateString).toLocaleDateString(locale, options);
 };
 
 onMounted(() => {

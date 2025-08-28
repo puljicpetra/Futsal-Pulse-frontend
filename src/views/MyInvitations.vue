@@ -22,38 +22,68 @@
         </div>
 
         <div v-if="invitations.length > 0" class="invitations-list">
-          <div v-for="invitation in invitations" :key="invitation._id" class="invitation-card">
-            
+          <div
+            v-for="invitation in invitations"
+            :key="invitation._id"
+            class="invitation-card"
+          >
             <div class="card-header">
-                <i class="fas fa-shield-alt team-icon"></i>
-                <div class="team-name-container">
-                    <p>Invitation to join the team:</p>
-                    <span class="team-name">{{ invitation.data.team.name }}</span>
-                </div>
+              <i class="fas fa-shield-alt team-icon"></i>
+              <div class="team-name-container">
+                <p>Invitation to join the team:</p>
+                <span class="team-name">{{ invitation.data?.team?.name }}</span>
+              </div>
             </div>
 
             <div class="card-body">
-                <div v-if="invitation.data.captain" class="captain-info">
-                    <strong>Invited by (Captain):</strong>
-                    <span>{{ invitation.data.captain.full_name || invitation.data.captain.username }}</span>
-                    <span class="username-muted">(@{{ invitation.data.captain.username }})</span>
+              <div v-if="invitation.data?.captain" class="captain-info">
+                <strong>Invited by (Captain):</strong>
+                <span>{{ invitation.data.captain.full_name || invitation.data.captain.username }}</span>
+                <span class="username-muted">(@{{ invitation.data.captain.username }})</span>
+              </div>
+
+              <div
+                v-if="invitation.data?.team?.players?.length"
+                class="players-info"
+              >
+                <strong>Current Roster ({{ invitation.data.team.players.length }} players):</strong>
+                <div class="players-tags">
+                  <span
+                    v-for="player in invitation.data.team.players"
+                    :key="player._id"
+                    class="player-tag"
+                  >
+                    {{ player.full_name || player.username }}
+                  </span>
                 </div>
-                <div v-if="invitation.data.team && invitation.data.team.players" class="players-info">
-                    <strong>Current Roster ({{ invitation.data.team.players.length }} players):</strong>
-                    <div class="players-tags">
-                        <span v-for="player in invitation.data.team.players" :key="player._id" class="player-tag">
-                            {{ player.full_name || player.username }}
-                        </span>
-                    </div>
-                </div>
+              </div>
             </div>
 
             <div class="invitation-actions">
-              <button @click="respondToInvitation(invitation, 'accepted')" :disabled="respondingId === invitation._id" class="btn-accept">
-                <i class="fas fa-check"></i> Accept
+              <button
+                @click="respondToInvitation(invitation, 'accepted')"
+                :disabled="respondingId === invitation._id"
+                class="btn-accept"
+              >
+                <template v-if="respondingId === invitation._id">
+                  <span class="spinner-xs"></span> Processing…
+                </template>
+                <template v-else>
+                  <i class="fas fa-check"></i> Accept
+                </template>
               </button>
-              <button @click="respondToInvitation(invitation, 'rejected')" :disabled="respondingId === invitation._id" class="btn-reject">
-                <i class="fas fa-times"></i> Reject
+
+              <button
+                @click="respondToInvitation(invitation, 'rejected')"
+                :disabled="respondingId === invitation._id"
+                class="btn-reject"
+              >
+                <template v-if="respondingId === invitation._id">
+                  <span class="spinner-xs"></span> Processing…
+                </template>
+                <template v-else>
+                  <i class="fas fa-times"></i> Reject
+                </template>
               </button>
             </div>
           </div>
@@ -88,15 +118,18 @@ const fetchInvitations = async () => {
   isLoading.value = true;
   error.value = '';
   try {
-    const response = await apiClient.get('/api/notifications');
-    invitations.value = response.data.filter(n => 
-        n.type === 'team_invitation' && 
-        n.data && 
-        n.data.team
-    );
+    const { data } = await apiClient.get('/api/notifications');
+
+    invitations.value = (data || [])
+      .filter(n =>
+        n?.type === 'team_invitation' &&
+        n?.data?.team
+      )
+      .filter(n => !n.to || n.to === authStore.userId || n.userId === authStore.userId)
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   } catch (err) {
-    console.error("Error fetching notifications:", err);
-    error.value = 'Failed to fetch invitations.';
+    console.error('Error fetching notifications:', err);
+    error.value = err.response?.data?.message || 'Failed to fetch invitations.';
   } finally {
     isLoading.value = false;
   }
@@ -107,16 +140,16 @@ const respondToInvitation = async (invitation, response) => {
   feedback.value = { type: '', text: '' };
   try {
     const result = await apiClient.post(`/api/invitations/${invitation._id}/respond`, { response });
-    feedback.value = { type: 'success', text: result.data.message };
+    feedback.value = { type: 'success', text: result.data?.message || 'Response sent.' };
 
     invitations.value = invitations.value.filter(inv => inv._id !== invitation._id);
 
-    authStore.fetchAllNotifications();
+    authStore.fetchAllNotifications?.();
 
     if (response === 'accepted') {
       setTimeout(() => {
         router.push('/teams');
-      }, 2000);
+      }, 1200);
     }
   } catch (err) {
     feedback.value = { type: 'error', text: err.response?.data?.message || 'Failed to respond to invitation.' };
@@ -125,9 +158,7 @@ const respondToInvitation = async (invitation, response) => {
   }
 };
 
-onMounted(() => {
-  fetchInvitations();
-});
+onMounted(fetchInvitations);
 </script>
 
 <style scoped>
@@ -181,8 +212,8 @@ h1 i {
 }
 
 .invitation-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
 }
 
 .card-header {
@@ -212,41 +243,41 @@ h1 i {
 }
 
 .card-body {
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .captain-info, .players-info {
-    font-size: 0.95rem;
+  font-size: 0.95rem;
 }
 
 .captain-info strong, .players-info strong {
-    color: #343a40;
-    margin-right: 0.5rem;
-    display: block;
-    margin-bottom: 0.5rem;
+  color: #343a40;
+  margin-right: 0.5rem;
+  display: block;
+  margin-bottom: 0.5rem;
 }
 
 .username-muted {
-    color: #6c757d;
-    font-size: 0.9em;
+  color: #6c757d;
+  font-size: 0.9em;
 }
 
 .players-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .player-tag {
-    background-color: #e9ecef;
-    color: #495057;
-    padding: 0.25rem 0.6rem;
-    border-radius: 12px;
-    font-size: 0.85rem;
-    font-weight: 500;
+  background-color: #e9ecef;
+  color: #495057;
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 .invitation-actions {
@@ -272,8 +303,8 @@ h1 i {
 }
 
 .btn-accept:disabled, .btn-reject:disabled {
-    cursor: not-allowed;
-    opacity: 0.7;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .btn-accept {
@@ -348,6 +379,16 @@ h1 i {
   height: 40px;
   animation: spin 1s linear infinite;
   margin: 0 auto 1rem;
+}
+
+.spinner-xs {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.5);
+  border-top: 2px solid #fff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {

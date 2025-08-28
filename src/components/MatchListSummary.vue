@@ -3,7 +3,7 @@
     <div class="card-header-flex">
       <h2><i class="fas fa-clipboard-list"></i> Match Schedule</h2>
       <button v-if="isOwner" class="btn-add-match" @click="emit('add-match')">
-          <i class="fas fa-plus"></i> Add Match
+        <i class="fas fa-plus"></i> Add Match
       </button>
     </div>
     
@@ -11,31 +11,31 @@
     <div v-else-if="matches.length === 0" class="text-muted">No matches scheduled yet.</div>
     
     <ul v-else class="matches-list-summary">
-        <li v-for="match in matches" :key="match._id" class="match-item-summary">
-            <div class="match-info-summary">
-                <span class="team-name">{{ match.teamA.name || 'TBD' }}</span>
-                <span class="match-score">
-                    {{ finalScore(match).teamA }} : {{ finalScore(match).teamB }}
-                </span>
-                <span class="team-name">{{ match.teamB.name || 'TBD' }}</span>
-            </div>
-            <div class="match-meta-summary">
-                <span>{{ formatMatchDate(match.matchDate) }}</span>
-                <span v-if="match.status === 'finished'" class="status-badge finished">Final</span>
-            </div>
-        </li>
+      <li v-for="match in matches" :key="match._id" class="match-item-summary">
+        <div class="match-info-summary">
+          <span class="team-name">{{ match.teamA?.name || 'TBD' }}</span>
+          <span class="match-score">
+            {{ finalScore(match).teamA }} : {{ finalScore(match).teamB }}
+          </span>
+          <span class="team-name">{{ match.teamB?.name || 'TBD' }}</span>
+        </div>
+        <div class="match-meta-summary">
+          <span>{{ formatMatchDate(match.matchDate) }}</span>
+          <span v-if="match.status === 'finished'" class="status-badge finished">Final</span>
+        </div>
+      </li>
     </ul>
 
     <div class="footer-actions">
-        <router-link :to="`/matches?tournamentId=${tournamentId}`" class="btn-see-all">
-            See All Matches
-        </router-link>
+      <router-link :to="`/matches?tournamentId=${tournamentId}`" class="btn-see-all">
+        See All Matches
+      </router-link>
     </div>
   </section>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import apiClient from '@/services/api';
 
 const props = defineProps({
@@ -51,31 +51,40 @@ const isLoading = ref(true);
 const fetchMatchesSummary = async () => {
   isLoading.value = true;
   try {
-    const response = await apiClient.get(`/api/matches/tournament/${props.tournamentId}?limit=4`);
-    matches.value = response.data;
+    const { data } = await apiClient.get(
+      `/api/matches/tournament/${props.tournamentId}`,
+      { params: { limit: 4 } }
+    );
+    matches.value = (data || []).slice().sort(
+      (a, b) => new Date(a.matchDate) - new Date(b.matchDate)
+    );
   } catch (err) {
-    console.error("Failed to fetch matches summary:", err);
+    console.error('Failed to fetch matches summary:', err);
+    matches.value = [];
   } finally {
     isLoading.value = false;
   }
 };
 
+defineExpose({ fetchMatchesSummary });
+
 const finalScore = (match) => {
-    let final = { teamA: match.score.teamA ?? 0, teamB: match.score.teamB ?? 0 };
-    if (match.overtime_score) {
-        final.teamA += match.overtime_score.teamA;
-        final.teamB += match.overtime_score.teamB;
-    }
-    return final;
+  const baseA = match.score?.teamA ?? 0;
+  const baseB = match.score?.teamB ?? 0;
+  const otA = match.overtime_score?.teamA ?? 0;
+  const otB = match.overtime_score?.teamB ?? 0;
+  return { teamA: baseA + otA, teamB: baseB + otB };
 };
 
 const formatMatchDate = (dateString) => {
   if (!dateString) return 'N/A';
+  const locale = navigator.language || undefined;
   const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
-  return new Date(dateString).toLocaleString('en-US', options);
+  return new Date(dateString).toLocaleString(locale, options);
 };
 
 onMounted(fetchMatchesSummary);
+watch(() => props.tournamentId, () => fetchMatchesSummary());
 </script>
 
 <style scoped>
@@ -179,21 +188,21 @@ onMounted(fetchMatchesSummary);
 }
 
 .footer-actions {
-    text-align: center;
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid #f0f0f0;
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #f0f0f0;
 }
 
 .btn-see-all {
-    background-color: #0d6efd;
-    color: white;
-    padding: 0.7rem 1.5rem;
-    font-size: 1rem;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
+  background-color: #0d6efd;
+  color: white;
+  padding: 0.7rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
 }
 </style>

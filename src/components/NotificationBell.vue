@@ -116,25 +116,23 @@ const markAllAsRead = async () => {
 };
 
 const deleteNotification = async (notificationId) => {
-    try {
-        await apiClient.delete(`/api/notifications/${notificationId}`);
-        authStore.allNotifications = authStore.allNotifications.filter(n => n._id !== notificationId);
-        authStore.totalUnreadCount = authStore.allNotifications.filter(n => !n.isRead).length;
-    } catch (err) {
-        console.error("Failed to delete notification:", err);
-    }
+  try {
+    await apiClient.delete(`/api/notifications/${notificationId}`);
+    await authStore.fetchAllNotifications();
+  } catch (err) {
+    console.error("Failed to delete notification:", err);
+  }
 };
 
 const clearAllNotifications = async () => {
-    if (window.confirm("Are you sure you want to clear all notifications?")) {
-        try {
-            await apiClient.delete('/api/notifications');
-            authStore.allNotifications = [];
-            authStore.totalUnreadCount = 0;
-        } catch (err) {
-            console.error("Failed to clear all notifications:", err);
-        }
+  if (window.confirm("Are you sure you want to clear all notifications?")) {
+    try {
+      await apiClient.delete('/api/notifications');
+      await authStore.fetchAllNotifications();
+    } catch (err) {
+      console.error("Failed to clear all notifications:", err);
     }
+  }
 };
 </script>
 

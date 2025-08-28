@@ -31,12 +31,13 @@ export const useAuthStore = defineStore('auth', () => {
     async function fetchAllNotifications() {
         if (!isLoggedIn.value) return;
         try {
-            const response = await apiClient.get('/api/notifications');
-            allNotifications.value = response.data;
-            totalUnreadCount.value = response.data.filter(n => !n.isRead).length;
-            unreadInvitationCount.value = response.data.filter(n => n.type === 'team_invitation' && !n.isRead).length;
-        } catch (error) {
-            console.error("Failed to fetch all notifications:", error);
+            const { default: api } = await import('@/services/api');
+            const { data } = await api.get('/api/notifications');
+            allNotifications.value = data;
+            totalUnreadCount.value = data.filter(n => !n.isRead).length;
+            unreadInvitationCount.value = data.filter(n => n.type === 'team_invitation' && !n.isRead).length;
+        } catch (e) {
+            console.error('Failed to fetch all notifications:', e);
         }
     }
 

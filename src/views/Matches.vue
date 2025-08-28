@@ -47,22 +47,27 @@
         <div v-for="group in groupedMatches" :key="group.date" class="date-group">
           <h3 class="date-header">{{ formatDateGroup(group.date) }}</h3>
           <div class="matches-list">
-            <router-link v-for="match in group.matches" :key="match._id" :to="`/matches/${match._id}`" class="match-card-link">
+            <router-link
+              v-for="match in group.matches"
+              :key="match._id"
+              :to="`/matches/${match._id}`"
+              class="match-card-link"
+            >
               <div class="match-card">
                 <div class="match-card-header">
-                  <span class="tournament-name">{{ match.tournament.name }}</span>
+                  <span class="tournament-name">{{ match.tournament?.name || '—' }}</span>
                   <span v-if="match.group" class="group-badge">{{ match.group }}</span>
                 </div>
                 <div class="match-card-body">
                   <div class="team-info team-a">
-                    <span class="team-name">{{ match.teamA.name }}</span>
+                    <span class="team-name">{{ match.teamA?.name || 'TBD' }}</span>
                   </div>
                   <div class="score-info">
-                    <span class="score">{{ match.score.teamA ?? '-' }} : {{ match.score.teamB ?? '-' }}</span>
+                    <span class="score">{{ match.score?.teamA ?? '-' }} : {{ match.score?.teamB ?? '-' }}</span>
                     <span class="match-time">{{ formatTime(match.matchDate) }}</span>
                   </div>
                   <div class="team-info team-b">
-                    <span class="team-name">{{ match.teamB.name }}</span>
+                    <span class="team-name">{{ match.teamB?.name || 'TBD' }}</span>
                   </div>
                 </div>
               </div>
@@ -70,12 +75,18 @@
           </div>
         </div>
       </div>
-      
+
       <div v-else class="empty-state">
         <div class="empty-state-icon"><i class="fas fa-calendar-times"></i></div>
         <h2>No Matches Found</h2>
         <p>There are no matches scheduled or your filters did not return any results.</p>
-        <button v-if="filters.tournamentId || filters.teamId" @click="clearFilters" class="btn-clear-main">Clear Filters</button>
+        <button
+          v-if="filters.tournamentId || filters.teamId"
+          @click="clearFilters"
+          class="btn-clear-main"
+        >
+          Clear Filters
+        </button>
       </div>
     </div>
   </div>
@@ -98,19 +109,26 @@ const filters = ref({
   teamId: null
 });
 
+const toLocalDateKey = (dateString) => {
+  const d = new Date(dateString);
+  const pad = (n) => String(n).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const fetchMatches = async () => {
   isLoading.value = true;
   error.value = '';
   try {
     const params = new URLSearchParams();
-    if (filters.value.tournamentId) {
-        params.append('tournamentId', filters.value.tournamentId);
-    }
-    if (filters.value.teamId) {
-        params.append('teamId', filters.value.teamId);
-    }
-    const response = await apiClient.get(`/api/matches?${params.toString()}`);
-    allMatches.value = response.data;
+    if (filters.value.tournamentId) params.append('tournamentId', filters.value.tournamentId);
+    if (filters.value.teamId) params.append('teamId', filters.value.teamId);
+
+    const qs = params.toString();
+    const { data } = await apiClient.get(`/api/matches${qs ? `?${qs}` : ''}`);
+    allMatches.value = data || [];
   } catch (err) {
     error.value = err.response?.data?.message || 'Failed to fetch matches.';
   } finally {
@@ -119,36 +137,35 @@ const fetchMatches = async () => {
 };
 
 const fetchFilterData = async () => {
-    try {
-        const [tournamentsRes, teamsRes] = await Promise.all([
-            apiClient.get('/api/tournaments'),
-            apiClient.get('/api/teams')
-        ]);
-        allTournaments.value = tournamentsRes.data;
-        allTeams.value = teamsRes.data;
-    } catch (err) {
-        console.error("Failed to load filter data:", err);
-    }
+  try {
+    const [tournamentsRes, teamsRes] = await Promise.all([
+      apiClient.get('/api/tournaments'),
+      apiClient.get('/api/teams')
+    ]);
+    allTournaments.value = tournamentsRes.data || [];
+    allTeams.value = teamsRes.data || [];
+  } catch (err) {
+    console.error('Failed to load filter data:', err);
+  }
 };
 
 const groupedMatches = computed(() => {
-  const groups = allMatches.value.reduce((acc, match) => {
-    const date = match.matchDate.split('T')[0];
-    if (!acc[date]) {
-      acc[date] = [];
-    }
-    acc[date].push(match);
-    return acc;
-  }, {});
-
-  return Object.keys(groups).map(date => ({
-    date: date,
-    matches: groups[date]
-  }));
+  const map = new Map();
+  for (const m of allMatches.value) {
+    const key = m?.matchDate ? toLocalDateKey(m.matchDate) : 'Unknown';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(m);
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, matches]) => ({
+      date,
+      matches: matches.slice().sort((a, b) => new Date(a.matchDate) - new Date(b.matchDate))
+    }));
 });
 
 const applyFilters = () => {
-    fetchMatches();
+  fetchMatches();
 };
 
 const clearFilters = () => {
@@ -158,21 +175,22 @@ const clearFilters = () => {
 };
 
 const formatDateGroup = (dateString) => {
+  const locale = navigator.language || undefined;
   const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-  return new Date(dateString).toLocaleDateString('en-US', options);
+  return new Date(dateString).toLocaleDateString(locale, options);
 };
 
 const formatTime = (dateString) => {
+  const locale = navigator.language || undefined;
   const options = { hour: '2-digit', minute: '2-digit', hour12: false };
-  return new Date(dateString).toLocaleTimeString('en-US', options);
+  return new Date(dateString).toLocaleTimeString(locale, options);
 };
 
 onMounted(() => {
-    if (route.query.tournamentId) {
-        filters.value.tournamentId = route.query.tournamentId;
-    }
-    fetchMatches();
-    fetchFilterData();
+  if (route.query.tournamentId) filters.value.tournamentId = route.query.tournamentId;
+  if (route.query.teamId) filters.value.teamId = route.query.teamId;
+  fetchMatches();
+  fetchFilterData();
 });
 </script>
 

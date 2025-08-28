@@ -33,12 +33,12 @@
           <div class="card-body">
             <div class="card-info">
               <p><strong>Players:</strong> {{ team.players.length }}</p>
-              <p v-if="team.captain === authStore.userId" class="captain-badge">
+              <p v-if="isCaptain(team)" class="captain-badge">
                 <i class="fas fa-crown"></i> You are the Captain
               </p>
             </div>
             <router-link :to="`/teams/${team._id}`" class="btn-details">
-              <span v-if="team.captain === authStore.userId">
+              <span v-if="isCaptain(team)">
                 <i class="fas fa-cog"></i> Manage Team
               </span>
               <span v-else>
@@ -67,7 +67,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import apiClient from '@/services/api';
 import { useAuthStore } from '@/stores/auth';
 
@@ -76,14 +76,28 @@ const myTeams = ref([]);
 const isLoading = ref(true);
 const error = ref('');
 
+const oidString = (v) =>
+  typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null);
+const idEq = (a, b) => {
+  const sa = oidString(a);
+  const sb = oidString(b);
+  return !!sa && !!sb && sa === sb;
+};
+const isCaptain = (team) => idEq(team?.captain, authStore.userId);
+
 const fetchMyTeams = async () => {
   isLoading.value = true;
   error.value = '';
   try {
-    const response = await apiClient.get('/api/teams');
-    myTeams.value = response.data;
+    const { data } = await apiClient.get('/api/teams');
+    myTeams.value = Array.isArray(data) ? data : [];
   } catch (err) {
-    error.value = err.response?.data?.message || 'Failed to fetch your teams.';
+    const status = err.response?.status;
+    if (status === 401) {
+      error.value = 'Please log in to view your teams.';
+    } else {
+      error.value = err.response?.data?.message || 'Failed to fetch your teams.';
+    }
   } finally {
     isLoading.value = false;
   }
@@ -94,6 +108,12 @@ onMounted(() => {
     fetchMyTeams();
   } else {
     isLoading.value = false;
+  }
+});
+
+watch(() => authStore.userRole, (role) => {
+  if (role === 'player' && myTeams.value.length === 0) {
+    fetchMyTeams();
   }
 });
 </script>
@@ -144,7 +164,7 @@ h1 {
 
 .btn-create:hover {
   background-color: #008fbf;
-  box-shadow: 0 4px 15px #008fbf(40, 167, 69, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 143, 191, 0.2);
   transform: translateY(-2px);
 }
 

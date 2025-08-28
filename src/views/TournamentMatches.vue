@@ -1,74 +1,104 @@
 <template>
-  <section class="schedule-section card">
-    <div class="card-header-flex">
-      <h2><i class="fas fa-clipboard-list"></i> Match Schedule</h2>
-      <button v-if="isOwner" class="btn-add-match" @click="emit('add-match')">
-          <i class="fas fa-plus"></i> Add Match
-      </button>
+  <div class="tournament-matches-page">
+    <div v-if="isLoading" class="loading-state">
+      <div class="spinner"></div>
     </div>
-    
-    <div v-if="isLoading" class="loading-state-small">Loading matches...</div>
-    <div v-else-if="matches.length === 0" class="text-muted">No matches scheduled yet.</div>
-    
-    <ul v-else class="matches-list">
+    <div v-else-if="error" class="error-state">
+      <p>{{ error }}</p>
+    </div>
+    <div v-else>
+      <div class="page-header">
+        <h1>Match Schedule</h1>
+        <router-link v-if="tournament" :to="`/tournaments/${tournament._id}`" class="back-link">
+          <i class="fas fa-arrow-left"></i> Back to Tournament
+        </router-link>
+      </div>
+      
+      <ul class="matches-list">
         <li v-for="match in matches" :key="match._id" class="match-item">
-            <div class="match-info">
-                <span class="team-name">{{ match.teamA.name || 'TBD' }}</span>
-                <span class="match-score">
-                    {{ finalScore(match).teamA }} : {{ finalScore(match).teamB }}
-                    <span v-if="match.result_type === 'penalties' && match.penalty_shootout" class="penalty-score">
-                        ({{ match.penalty_shootout.teamA_goals }} - {{ match.penalty_shootout.teamB_goals }})
-                    </span>
-                </span>
-                <span class="team-name">{{ match.teamB.name || 'TBD' }}</span>
-            </div>
-            <div class="match-meta">
-                <span>{{ formatMatchDate(match.matchDate) }}</span>
-                <span v-if="match.result_type === 'penalties'" class="status-badge penalty">PSO</span>
-                <span v-else-if="match.result_type === 'overtime'" class="status-badge overtime">AET</span>
-                <span v-if="match.status === 'finished'" class="status-badge finished">Final</span>
-                <span v-else-if="match.group" class="group-badge">{{ match.group }}</span>
+          <div class="match-info">
+            <span class="team-name">{{ match.teamA.name || 'TBD' }}</span>
+            <span class="match-score">
+              {{ finalScore(match).teamA }} : {{ finalScore(match).teamB }}
+              <span v-if="match.result_type === 'penalties' && match.penalty_shootout" class="penalty-score">
+                ({{ match.penalty_shootout.teamA_goals }} - {{ match.penalty_shootout.teamB_goals }})
+              </span>
+            </span>
+            <span class="team-name">{{ match.teamB.name || 'TBD' }}</span>
+          </div>
+
+          <div class="match-meta">
+            <span>{{ formatMatchDate(match.matchDate) }}</span>
+            <span v-if="match.result_type === 'penalties'" class="status-badge penalty">PSO</span>
+            <span v-else-if="match.result_type === 'overtime'" class="status-badge overtime">AET</span>
+            <span v-if="match.status === 'finished'" class="status-badge finished">Final</span>
+            <span v-else-if="match.group" class="group-badge">{{ match.group }}</span>
+          </div>
+
+          <div v-if="match.events && match.events.length > 0" class="event-timeline-container">
+            <div class="timeline-team">
+              <div
+                v-for="event in sortedTeamEvents(match.events, match.teamA._id, false)"
+                :key="event._id"
+                class="event-item"
+              >
+                <i :class="getEventIcon(event.type)"></i>
+                <span>{{ getPlayerName(event.playerId) }} {{ event.minute }}'</span>
+              </div>
+              <div v-if="teamHasOvertimeEvents(match.events, match.teamA._id)" class="period-header-timeline">Overtime</div>
+              <div
+                v-for="event in sortedTeamEvents(match.events, match.teamA._id, true)"
+                :key="event._id"
+                class="event-item"
+              >
+                <i :class="getEventIcon(event.type)"></i>
+                <span>{{ getPlayerName(event.playerId) }} {{ event.minute }}'</span>
+              </div>
             </div>
 
-            <div v-if="match.events && match.events.length > 0" class="event-timeline-container">
-                <div class="timeline-team">
-                    <div v-for="event in sortedTeamEvents(match.events, match.teamA._id, false)" :key="event._id" class="event-item">
-                        <i :class="getEventIcon(event.type)"></i>
-                        <span>{{ getPlayerName(event.playerId) }} {{ event.minute }}'</span>
-                    </div>
-                    <div v-if="teamHasOvertimeEvents(match.events, match.teamA._id)" class="period-header-timeline">Overtime</div>
-                    <div v-for="event in sortedTeamEvents(match.events, match.teamA._id, true)" :key="event._id" class="event-item">
-                        <i :class="getEventIcon(event.type)"></i>
-                        <span>{{ getPlayerName(event.playerId) }} {{ event.minute }}'</span>
-                    </div>
-                </div>
-                <div class="timeline-team right">
-                    <div v-for="event in sortedTeamEvents(match.events, match.teamB._id, false)" :key="event._id" class="event-item">
-                        <span>{{ event.minute }}' {{ getPlayerName(event.playerId) }}</span>
-                        <i :class="getEventIcon(event.type)"></i>
-                    </div>
-                     <div v-if="teamHasOvertimeEvents(match.events, match.teamB._id)" class="period-header-timeline">Overtime</div>
-                    <div v-for="event in sortedTeamEvents(match.events, match.teamB._id, true)" :key="event._id" class="event-item">
-                        <span>{{ event.minute }}' {{ getPlayerName(event.playerId) }}</span>
-                        <i :class="getEventIcon(event.type)"></i>
-                    </div>
-                </div>
+            <div class="timeline-team right">
+              <div
+                v-for="event in sortedTeamEvents(match.events, match.teamB._id, false)"
+                :key="event._id"
+                class="event-item"
+              >
+                <span>{{ event.minute }}' {{ getPlayerName(event.playerId) }}</span>
+                <i :class="getEventIcon(event.type)"></i>
+              </div>
+              <div v-if="teamHasOvertimeEvents(match.events, match.teamB._id)" class="period-header-timeline">Overtime</div>
+              <div
+                v-for="event in sortedTeamEvents(match.events, match.teamB._id, true)"
+                :key="event._id"
+                class="event-item"
+              >
+                <span>{{ event.minute }}' {{ getPlayerName(event.playerId) }}</span>
+                <i :class="getEventIcon(event.type)"></i>
+              </div>
             </div>
-            
-            <div v-if="isOwner" class="owner-actions">
-                <button @click.stop="toggleMenu(match._id)" class="btn-menu" title="Actions"><i class="fas fa-ellipsis-v"></i></button>
-                <div v-if="openMenuId === match._id" class="actions-dropdown">
-                    <a v-if="match.status !== 'finished'" @click="openEventsModal(match)"><i class="fas fa-stopwatch"></i> Manage Events</a>
-                    <a v-if="match.status !== 'finished'" @click="finishMatch(match._id)"><i class="fas fa-flag-checkered"></i> Finish Match</a>
-                    <a @click="deleteMatch(match._id)" class="text-danger"><i class="fas fa-trash-alt"></i> Delete Match</a>
-                </div>
+          </div>
+          
+          <div v-if="isOwner" class="owner-actions">
+            <button @click.stop="toggleMenu(match._id)" class="btn-menu" title="Actions">
+              <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <div v-if="openMenuId === match._id" class="actions-dropdown">
+              <a v-if="match.status !== 'finished'" @click="openEventsModal(match)">
+                <i class="fas fa-stopwatch"></i> Manage Events
+              </a>
+              <a v-if="match.status !== 'finished'" @click="finishMatch(match._id)">
+                <i class="fas fa-flag-checkered"></i> Finish Match
+              </a>
+              <a @click="deleteMatch(match._id)" class="text-danger">
+                <i class="fas fa-trash-alt"></i> Delete Match
+              </a>
             </div>
+          </div>
         </li>
-    </ul>
-  </section>
+      </ul>
+    </div>
 
-  <div v-if="showEventsModal" class="modal-overlay" @click.self="closeEventsModal">
-    <div class="modal-content large">
+    <div v-if="showEventsModal" class="modal-overlay" @click.self="closeEventsModal">
+      <div class="modal-content large">
         <h3>Manage Match Events</h3>
         <p v-if="selectedMatch">{{ selectedMatch.teamA.name }} vs {{ selectedMatch.teamB.name }}</p>
 
@@ -83,18 +113,53 @@
         
         <div v-if="newEventPeriod !== 'penalties'" class="event-section">
           <form @submit.prevent="handleAddEvent" class="event-form">
-              <select v-model="newEvent.teamId" required><option :value="null" disabled>Select Team</option><option :value="selectedMatch.teamA._id">{{ selectedMatch.teamA.name }}</option><option :value="selectedMatch.teamB._id">{{ selectedMatch.teamB.name }}</option></select>
-              <select v-model="newEvent.playerId" required :disabled="!newEvent.teamId"><option :value="null" disabled>Select Player</option><option v-for="player in availablePlayers" :key="player._id" :value="player._id">{{ player.name }}</option></select>
-              <select v-model="newEvent.type" required><option value="goal">Goal</option><option value="yellow-card">Yellow Card</option><option value="red-card">Red Card</option></select>
-              <input type="text" inputmode="numeric" pattern="[0-9]*" v-model.number="newEvent.minute" placeholder="Min" required class="minute-input" />
-              <button type="submit" class="btn-submit small" :disabled="isSubmittingEvent">Add</button>
+            <select v-model="newEvent.teamId" required>
+              <option :value="null" disabled>Select Team</option>
+              <option :value="selectedMatch.teamA._id">{{ selectedMatch.teamA.name }}</option>
+              <option :value="selectedMatch.teamB._id">{{ selectedMatch.teamB.name }}</option>
+            </select>
+
+            <select v-model="newEvent.playerId" required :disabled="!newEvent.teamId">
+              <option :value="null" disabled>Select Player</option>
+              <option v-for="player in availablePlayers" :key="player._id" :value="player._id">
+                {{ player.name }}
+              </option>
+            </select>
+
+            <select v-model="newEvent.type" required>
+              <option value="goal">Goal</option>
+              <option value="yellow-card">Yellow Card</option>
+              <option value="red-card">Red Card</option>
+            </select>
+
+            <input
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              v-model.number="newEvent.minute"
+              placeholder="Min"
+              required
+              class="minute-input"
+            />
+            <button type="submit" class="btn-submit small" :disabled="isSubmittingEvent">Add</button>
           </form>
         </div>
 
         <div v-if="newEventPeriod === 'penalties'" class="event-section">
           <form @submit.prevent="handleAddPenaltyEvent" class="penalty-form">
-            <select v-model="newPenalty.teamId" required><option :value="null" disabled>Select Team</option><option :value="selectedMatch.teamA._id">{{ selectedMatch.teamA.name }}</option><option :value="selectedMatch.teamB._id">{{ selectedMatch.teamB.name }}</option></select>
-            <select v-model="newPenalty.playerId" required :disabled="!newPenalty.teamId"><option :value="null" disabled>Select Player</option><option v-for="player in availablePenaltyTakers" :key="player._id" :value="player._id">{{ player.name }}</option></select>
+            <select v-model="newPenalty.teamId" required>
+              <option :value="null" disabled>Select Team</option>
+              <option :value="selectedMatch.teamA._id">{{ selectedMatch.teamA.name }}</option>
+              <option :value="selectedMatch.teamB._id">{{ selectedMatch.teamB.name }}</option>
+            </select>
+
+            <select v-model="newPenalty.playerId" required :disabled="!newPenalty.teamId">
+              <option :value="null" disabled>Select Player</option>
+              <option v-for="player in availablePenaltyTakers" :key="player._id" :value="player._id">
+                {{ player.name }}
+              </option>
+            </select>
+
             <div class="penalty-actions">
               <button type="button" @click="newPenalty.outcome = 'scored'; handleAddPenaltyEvent()" class="btn-submit small">Scored</button>
               <button type="button" @click="newPenalty.outcome = 'missed'; handleAddPenaltyEvent()" class="btn-cancel small">Missed</button>
@@ -102,43 +167,76 @@
           </form>
         </div>
 
-        <div v-if="isRegularTimeTie(selectedMatch) && selectedMatch.result_type === 'regular'" class="proceed-section"><button @click="handleProceedToOvertime" class="btn-proceed">Proceed to Overtime</button></div>
-        <div v-if="isOvertimeTie(selectedMatch) && selectedMatch.result_type === 'overtime'" class="proceed-section"><button @click="handleProceedToPenalties" class="btn-proceed">Proceed to Penalties</button></div>
+        <div v-if="isRegularTimeTie(selectedMatch) && selectedMatch.result_type === 'regular'" class="proceed-section">
+          <button @click="handleProceedToOvertime" class="btn-proceed">Proceed to Overtime</button>
+        </div>
+        <div v-if="isOvertimeTie(selectedMatch) && selectedMatch.result_type === 'overtime'" class="proceed-section">
+          <button @click="handleProceedToPenalties" class="btn-proceed">Proceed to Penalties</button>
+        </div>
 
         <div class="existing-events-list">
           <div v-if="regularTimeEvents.length > 0">
             <div class="period-header">Regular Time</div>
-            <div v-for="event in regularTimeEvents" :key="event._id" class="existing-event-item"><span><i :class="getEventIcon(event.type)"></i> {{ event.minute }}' - {{ getPlayerName(event.playerId) }} ({{ getTeamName(event.teamId) }})</span><button @click="handleDeleteEvent(selectedMatch._id, event._id)" class="btn-delete-event" title="Delete Event"><i class="fas fa-times"></i></button></div>
+            <div v-for="event in regularTimeEvents" :key="event._id" class="existing-event-item">
+              <span>
+                <i :class="getEventIcon(event.type)"></i>
+                {{ event.minute }}' - {{ getPlayerName(event.playerId) }} ({{ getTeamName(event.teamId) }})
+              </span>
+              <button @click="handleDeleteEvent(selectedMatch._id, event._id)" class="btn-delete-event" title="Delete Event">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
           </div>
+
           <div v-if="overtimeEvents.length > 0">
             <div class="period-header">Overtime</div>
-            <div v-for="event in overtimeEvents" :key="event._id" class="existing-event-item overtime-event"><span><i :class="getEventIcon(event.type)"></i> {{ event.minute }}' - {{ getPlayerName(event.playerId) }} ({{ getTeamName(event.teamId) }})</span><button @click="handleDeleteEvent(selectedMatch._id, event._id)" class="btn-delete-event" title="Delete Event"><i class="fas fa-times"></i></button></div>
+            <div v-for="event in overtimeEvents" :key="event._id" class="existing-event-item overtime-event">
+              <span>
+                <i :class="getEventIcon(event.type)"></i>
+                {{ event.minute }}' - {{ getPlayerName(event.playerId) }} ({{ getTeamName(event.teamId) }})
+              </span>
+              <button @click="handleDeleteEvent(selectedMatch._id, event._id)" class="btn-delete-event" title="Delete Event">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
           </div>
+
           <div v-if="penaltyEvents.length > 0">
             <div class="period-header">Penalty Shootout</div>
-            <div v-for="event in penaltyEvents" :key="event._id" class="existing-event-item"><span><i :class="getPenaltyIcon(event.outcome)"></i> {{ getPlayerName(event.playerId) }} ({{ getTeamName(event.teamId) }})</span><button class="btn-delete-event" title="Delete Penalty" @click="handleDeletePenaltyEvent(selectedMatch._id, event._id)"><i class="fas fa-times"></i></button></div>
+            <div v-for="event in penaltyEvents" :key="event._id" class="existing-event-item">
+              <span>
+                <i :class="getPenaltyIcon(event.outcome)"></i>
+                {{ getPlayerName(event.playerId) }} ({{ getTeamName(event.teamId) }})
+              </span>
+            </div>
           </div>
         </div>
 
-        <div class="modal-actions"><button type="button" @click="closeEventsModal" class="btn-cancel">Done</button></div>
+        <div class="modal-actions">
+          <button type="button" @click="closeEventsModal" class="btn-cancel">Done</button>
+        </div>
         <p v-if="eventsModalError" class="error-message">{{ eventsModalError }}</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { useRoute } from 'vue-router';
 import apiClient from '@/services/api';
+import { useAuthStore } from '@/stores/auth';
 
-const props = defineProps({
-  tournamentId: { type: String, required: true },
-  isOwner: { type: Boolean, default: false }
-});
-const emit = defineEmits(['feedback', 'add-match']);
+const route = useRoute();
+const authStore = useAuthStore();
+const tournamentId = route.params.id;
 
 const matches = ref([]);
+const tournament = ref(null);
 const isLoading = ref(true);
+const error = ref('');
 const openMenuId = ref(null);
+
 const allPlayers = ref(new Map());
 
 const showEventsModal = ref(false);
@@ -149,58 +247,83 @@ const newEventPeriod = ref('regular');
 const newEvent = ref({ type: 'goal', teamId: null, playerId: null, minute: null });
 const newPenalty = ref({ teamId: null, playerId: null, outcome: null });
 
+const oidString = (v) =>
+  typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null);
+
+const idEq = (a, b) => {
+  const sa = oidString(a);
+  const sb = oidString(b);
+  return !!sa && !!sb && sa === sb;
+};
+
+const isOwner = computed(() => {
+  if (!authStore.isLoggedIn || !tournament.value) return false;
+  const orgId = oidString(tournament.value.organizer) || oidString(tournament.value.organizerInfo?._id);
+  return idEq(orgId, authStore.userId);
+});
+
+const fetchTournamentData = async () => {
+  try {
+    const { data } = await apiClient.get(`/api/tournaments/${tournamentId}`);
+    tournament.value = data;
+  } catch (err) {
+    console.error("Failed to fetch tournament data for header:", err);
+  }
+};
+
 const fetchMatches = async () => {
   isLoading.value = true;
   allPlayers.value.clear();
   try {
-    const response = await apiClient.get(`/api/matches/tournament/${props.tournamentId}`);
-    const fetchedMatches = response.data;
-    for (const match of fetchedMatches) {
-      if (match.teamA && match.teamA.players) {
-        match.teamA.players.forEach(p => allPlayers.value.set(p._id, p));
-      }
-      if (match.teamB && match.teamB.players) {
-        match.teamB.players.forEach(p => allPlayers.value.set(p._id, p));
-      }
+    const { data } = await apiClient.get(`/api/matches/tournament/${tournamentId}`);
+    for (const match of data) {
+      match.teamA?.players?.forEach(p => allPlayers.value.set(p._id, p));
+      match.teamB?.players?.forEach(p => allPlayers.value.set(p._id, p));
     }
-    matches.value = fetchedMatches;
+    matches.value = data;
   } catch (err) {
     console.error("Failed to fetch matches:", err);
-    emit('feedback', { type: 'error', text: 'Could not load match schedule.' });
+    error.value = "Failed to load match schedule.";
   } finally {
     isLoading.value = false;
   }
 };
 
 const availablePlayers = computed(() => {
-    if (!newEvent.value.teamId || !selectedMatch.value) return [];
-    return newEvent.value.teamId === selectedMatch.value.teamA._id 
-        ? selectedMatch.value.teamA.players
-        : selectedMatch.value.teamB.players;
+  if (!newEvent.value.teamId || !selectedMatch.value) return [];
+  return newEvent.value.teamId === selectedMatch.value.teamA._id
+    ? selectedMatch.value.teamA.players
+    : selectedMatch.value.teamB.players;
 });
+
 const availablePenaltyTakers = computed(() => {
-    if (!newPenalty.value.teamId || !selectedMatch.value) return [];
-    return newPenalty.value.teamId === selectedMatch.value.teamA._id 
-        ? selectedMatch.value.teamA.players
-        : selectedMatch.value.teamB.players;
+  if (!newPenalty.value.teamId || !selectedMatch.value) return [];
+  return newPenalty.value.teamId === selectedMatch.value.teamA._id
+    ? selectedMatch.value.teamA.players
+    : selectedMatch.value.teamB.players;
 });
-const regularTimeEvents = computed(() => selectedMatch.value?.events?.filter(e => e.minute <= 40).sort((a,b) => a.minute - b.minute) || []);
-const overtimeEvents = computed(() => selectedMatch.value?.events?.filter(e => e.minute > 40).sort((a,b) => a.minute - b.minute) || []);
+
+const regularTimeEvents = computed(
+  () => selectedMatch.value?.events?.filter(e => e.minute <= 40).sort((a, b) => a.minute - b.minute) || []
+);
+const overtimeEvents = computed(
+  () => selectedMatch.value?.events?.filter(e => e.minute > 40).sort((a, b) => a.minute - b.minute) || []
+);
 const penaltyEvents = computed(() => selectedMatch.value?.penalty_shootout?.events || []);
 
 const isRegularTimeTie = (match) => match?.score.teamA === match?.score.teamB;
 const isOvertimeTie = (match) => {
-    if (!match || !match.overtime_score) return false;
-    return (match.score.teamA + match.overtime_score.teamA) === (match.score.teamB + match.overtime_score.teamB);
+  if (!match || !match.overtime_score) return false;
+  return (match.score.teamA + match.overtime_score.teamA) === (match.score.teamB + match.overtime_score.teamB);
 };
 
 const finalScore = (match) => {
-    let final = { teamA: match.score.teamA ?? 0, teamB: match.score.teamB ?? 0 };
-    if (match.overtime_score) {
-        final.teamA += match.overtime_score.teamA;
-        final.teamB += match.overtime_score.teamB;
-    }
-    return final;
+  let final = { teamA: match.score?.teamA ?? 0, teamB: match.score?.teamB ?? 0 };
+  if (match.overtime_score) {
+    final.teamA += match.overtime_score.teamA;
+    final.teamB += match.overtime_score.teamB;
+  }
+  return final;
 };
 
 const teamHasOvertimeEvents = (events, teamId) => {
@@ -211,146 +334,226 @@ const teamHasOvertimeEvents = (events, teamId) => {
 const formatMatchDate = (dateString) => {
   if (!dateString) return 'N/A';
   const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
-  return new Date(dateString).toLocaleString('en-US', options);
+  const locale = navigator.language || undefined;
+  return new Date(dateString).toLocaleString(locale, options);
 };
-const sortedEvents = (events) => {
-    if (!events) return [];
-    return [...events].sort((a, b) => a.minute - b.minute);
-};
+
 const sortedTeamEvents = (events, teamId, isOvertime) => {
-    if (!events) return [];
-    return events
-      .filter(e => {
-          const inOvertime = e.minute > 40;
-          return e.teamId === teamId && (isOvertime ? inOvertime : !inOvertime);
-      })
-      .sort((a, b) => a.minute - b.minute);
+  if (!events) return [];
+  return events
+    .filter(e => {
+      const inOvertime = e.minute > 40;
+      return e.teamId === teamId && (isOvertime ? inOvertime : !inOvertime);
+    })
+    .sort((a, b) => a.minute - b.minute);
 };
-const getEventIcon = (type) => ({'goal':'fas fa-futbol','yellow-card':'fas fa-square yellow-card','red-card':'fas fa-square red-card'}[type] || 'fas fa-question');
+
+const getEventIcon = (type) =>
+  ({ goal: 'fas fa-futbol', 'yellow-card': 'fas fa-square yellow-card', 'red-card': 'fas fa-square red-card' }[type] ||
+   'fas fa-question');
+
 const getPenaltyIcon = (outcome) => (outcome === 'scored' ? 'fas fa-check-circle' : 'fas fa-times-circle');
-const getPlayerName = (playerId) => allPlayers.value.get(playerId)?.name || 'Unknown'; 
+
+const getPlayerName = (playerId) => allPlayers.value.get(playerId)?.name || 'Unknown';
+
 const getTeamName = (teamId) => {
-    if (!selectedMatch.value) return '';
-    if (selectedMatch.value.teamA?._id === teamId) return selectedMatch.value.teamA.name;
-    if (selectedMatch.value.teamB?._id === teamId) return selectedMatch.value.teamB.name;
-    return 'Unknown';
+  if (!selectedMatch.value) return '';
+  if (selectedMatch.value.teamA?._id === teamId) return selectedMatch.value.teamA.name;
+  if (selectedMatch.value.teamB?._id === teamId) return selectedMatch.value.teamB.name;
+  return 'Unknown';
 };
 
 const closeMenu = () => { openMenuId.value = null; };
 const toggleMenu = (matchId) => { openMenuId.value = openMenuId.value === matchId ? null : matchId; };
-const closeEventsModal = () => { 
-    showEventsModal.value = false; 
-    selectedMatch.value = null; 
-    fetchMatches();
+
+const closeEventsModal = () => {
+  showEventsModal.value = false;
+  selectedMatch.value = null;
+  fetchMatches();
 };
+
 const openEventsModal = (match) => {
-    closeMenu();
-    selectedMatch.value = match;
-    newEventPeriod.value = 'regular';
-    eventsModalError.value = '';
-    newEvent.value = { type: 'goal', teamId: null, playerId: null, minute: null };
-    showEventsModal.value = true;
+  closeMenu();
+  selectedMatch.value = match;
+  newEventPeriod.value = 'regular';
+  eventsModalError.value = '';
+  newEvent.value = { type: 'goal', teamId: null, playerId: null, minute: null };
+  newPenalty.value = { teamId: null, playerId: null, outcome: null };
+  showEventsModal.value = true;
 };
 
 const handleAddEvent = async () => {
-    const minute = newEvent.value.minute;
-    const period = newEventPeriod.value;
-    if (!minute || minute < 1) { eventsModalError.value = "Minute must be a positive number."; return; }
-    if (period === 'regular' && minute > 40) { eventsModalError.value = "Regular time minutes cannot exceed 40."; return; }
-    if (period === 'overtime' && (minute <= 40 || minute > 50)) { eventsModalError.value = "Overtime minutes must be between 41 and 50."; return; }
+  const minute = newEvent.value.minute;
+  const period = newEventPeriod.value;
 
-    isSubmittingEvent.value = true;
-    eventsModalError.value = '';
-    try {
-        const response = await apiClient.post(`/api/matches/${selectedMatch.value._id}/events`, newEvent.value);
-        const updatedMatch = response.data.match;
-        const index = matches.value.findIndex(m => m._id === updatedMatch._id);
-        if (index !== -1) {
-            matches.value[index] = updatedMatch;
-        }
-        selectedMatch.value = updatedMatch;
-        newEvent.value = { type: 'goal', teamId: null, playerId: null, minute: null };
-    } catch (err) {
-        eventsModalError.value = err.response?.data?.message || 'Failed to add event.';
-    } finally {
-        isSubmittingEvent.value = false;
-    }
+  if (!minute || minute < 1) {
+    eventsModalError.value = "Minute must be a positive number.";
+    return;
+  }
+  if (period === 'regular' && minute > 40) {
+    eventsModalError.value = "Regular time minutes cannot exceed 40.";
+    return;
+  }
+  if (period === 'overtime' && (minute <= 40 || minute > 50)) {
+    eventsModalError.value = "Overtime minutes must be between 41 and 50.";
+    return;
+  }
+
+  isSubmittingEvent.value = true;
+  eventsModalError.value = '';
+  try {
+    const { data } = await apiClient.post(`/api/matches/${selectedMatch.value._id}/events`, newEvent.value);
+    const updatedMatch = data.match;
+    const index = matches.value.findIndex(m => m._id === updatedMatch._id);
+    if (index !== -1) matches.value[index] = updatedMatch;
+    selectedMatch.value = updatedMatch;
+    newEvent.value = { type: 'goal', teamId: null, playerId: null, minute: null };
+  } catch (err) {
+    eventsModalError.value = err.response?.data?.message || 'Failed to add event.';
+  } finally {
+    isSubmittingEvent.value = false;
+  }
 };
 
 const handleDeleteEvent = async (matchId, eventId) => {
-    if (!selectedMatch.value) return;
-    const originalEvents = [...selectedMatch.value.events];
-    const eventToDelete = originalEvents.find(e => e._id === eventId);
-    if (!eventToDelete) return;
-    selectedMatch.value.events = selectedMatch.value.events.filter(e => e._id !== eventId);
-    if(eventToDelete.type === 'goal') {
-        if (eventToDelete.minute > 40 && selectedMatch.value.overtime_score) {
-            const teamKey = eventToDelete.teamId === selectedMatch.value.teamA._id ? 'teamA' : 'teamB';
-            if (selectedMatch.value.overtime_score[teamKey] > 0) selectedMatch.value.overtime_score[teamKey]--;
-        } else {
-            const teamKey = eventToDelete.teamId === selectedMatch.value.teamA._id ? 'teamA' : 'teamB';
-            if (selectedMatch.value.score[teamKey] > 0) selectedMatch.value.score[teamKey]--;
-        }
-    }
-    try {
-        const response = await apiClient.delete(`/api/matches/${matchId}/events/${eventId}`);
-        const updatedMatch = response.data.match;
-        const index = matches.value.findIndex(m => m._id === matchId);
-        if (index !== -1) matches.value[index] = updatedMatch;
-        selectedMatch.value = updatedMatch;
-    } catch (err) {
-        console.error("Failed to delete event:", err);
-        eventsModalError.value = err.response?.data?.message || 'Failed to delete event.';
-        selectedMatch.value.events = originalEvents;
-    }
+  try {
+    const { data } = await apiClient.delete(`/api/matches/${matchId}/events/${eventId}`);
+    const updatedMatch = data.match;
+    const index = matches.value.findIndex(m => m._id === matchId);
+    if (index !== -1) matches.value[index] = updatedMatch;
+    selectedMatch.value = updatedMatch;
+  } catch (err) {
+    console.error("Failed to delete event:", err);
+    eventsModalError.value = err.response?.data?.message || 'Failed to delete event.';
+  }
 };
 
 const handleProceedToOvertime = () => {
-    selectedMatch.value.result_type = 'overtime';
-    newEventPeriod.value = 'overtime';
+  selectedMatch.value.result_type = 'overtime';
+  newEventPeriod.value = 'overtime';
 };
 const handleProceedToPenalties = () => {
-    selectedMatch.value.result_type = 'penalties';
-    newEventPeriod.value = 'penalties';
+  selectedMatch.value.result_type = 'penalties';
+  newEventPeriod.value = 'penalties';
 };
 
 const handleAddPenaltyEvent = async () => {
-    if (!newPenalty.value.outcome) return;
-    isSubmittingEvent.value = true;
-    eventsModalError.value = '';
-    try {
-        const response = await apiClient.post(`/api/matches/${selectedMatch.value._id}/penalties`, newPenalty.value);
-        const updatedMatch = response.data.match;
-        const index = matches.value.findIndex(m => m._id === updatedMatch._id);
-        if (index !== -1) {
-            matches.value[index] = updatedMatch;
-        }
-        selectedMatch.value = updatedMatch;
-        newPenalty.value = { teamId: newPenalty.value.teamId, playerId: null, outcome: null };
-    } catch (err) {
-        eventsModalError.value = err.response?.data?.message || 'Failed to add penalty event.';
-    } finally {
-        isSubmittingEvent.value = false;
-    }
+  if (!newPenalty.value.outcome) return;
+  isSubmittingEvent.value = true;
+  eventsModalError.value = '';
+  try {
+    const { data } = await apiClient.post(`/api/matches/${selectedMatch.value._id}/penalties`, newPenalty.value);
+    const updatedMatch = data.match;
+    const index = matches.value.findIndex(m => m._id === updatedMatch._id);
+    if (index !== -1) matches.value[index] = updatedMatch;
+    selectedMatch.value = updatedMatch;
+    newPenalty.value = { teamId: newPenalty.value.teamId, playerId: null, outcome: null };
+  } catch (err) {
+    eventsModalError.value = err.response?.data?.message || 'Failed to add penalty event.';
+  } finally {
+    isSubmittingEvent.value = false;
+  }
 };
 
-const handleDeletePenaltyEvent = async (matchId, eventId) => {};
+const deleteMatch = async (matchId) => {
+  closeMenu();
+  if (!window.confirm('Are you sure you want to delete this match? This action cannot be undone.')) return;
+  try {
+    await apiClient.delete(`/api/matches/${matchId}`);
+    matches.value = matches.value.filter(m => m._id !== matchId);
+  } catch (err) {
+    console.error("Failed to delete match:", err);
+    error.value = err.response?.data?.message || 'Failed to delete match.';
+    setTimeout(() => (error.value = ''), 3000);
+  }
+};
 
-const deleteMatch = async (matchId) => {};
-const finishMatch = async (matchId) => {};
+const finishMatch = async (matchId) => {
+  closeMenu();
+  if (!window.confirm('Mark this match as finished?')) return;
+  try {
+    const { data } = await apiClient.patch(`/api/matches/${matchId}/finish`);
+    const updated = data.match;
+    const idx = matches.value.findIndex(m => m._id === matchId);
+    if (idx !== -1) matches.value[idx] = updated;
+  } catch (err) {
+    console.error("Failed to finish match:", err);
+    error.value = err.response?.data?.message || 'Failed to finish match.';
+    setTimeout(() => (error.value = ''), 3000);
+  }
+};
+
+const toLocalInputValue = (date) => {
+  const d = new Date(date);
+  const pad = (n) => String(n).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+};
+
+const minDateTime = computed(() => {
+  if (!tournament.value?.startDate) return null;
+  return toLocalInputValue(tournament.value.startDate);
+});
+const maxDateTime = computed(() => {
+  if (!tournament.value?.endDate) return null;
+  return toLocalInputValue(tournament.value.endDate);
+});
+
+const formatDateTimeForInfo = (d) => {
+  const dt = new Date(d);
+  const locale = navigator.language || undefined;
+  return dt.toLocaleString(locale, { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false });
+};
 
 onMounted(() => {
   fetchMatches();
+  fetchTournamentData();
   window.addEventListener('click', closeMenu);
 });
 onUnmounted(() => {
   window.removeEventListener('click', closeMenu);
 });
-
-defineExpose({ fetchMatches });
 </script>
 
 <style scoped>
+.tournament-matches-page {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 2rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: #555;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  background-color: #f0f0f0;
+  transition: all 0.2s ease-in-out;
+}
+
+.back-link:hover {
+  background-color: #e0e0e0;
+}
+
 .card {
   background: white;
   padding: 2rem;

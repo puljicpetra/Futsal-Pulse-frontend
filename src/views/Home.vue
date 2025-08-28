@@ -1,7 +1,7 @@
 <template>
   <div class="home">
     <video autoplay muted loop playsinline class="video-background">
-      <source src="@/assets/futsal-pulse-video.mp4" type="video/mp4" />
+      <source :src="bgVideo" type="video/mp4" />
     </video>
 
     <div class="overlay">
@@ -29,10 +29,14 @@
   </div>
 </template>
 
+
 <script setup>
-import { useAuthStore } from '@/stores/auth';
-const authStore = useAuthStore();
+import bgVideo from '@/assets/futsal-pulse-video.mp4'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Fugaz+One&display=swap');

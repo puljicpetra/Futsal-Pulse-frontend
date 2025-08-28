@@ -1,15 +1,15 @@
 import apiClient from '@/services/api';
 
+const ABSOLUTE_RE = /^(https?:)?\/\//i;
+
 export function getImageUrl(relativePath) {
-  if (!relativePath) {
-    return null;
+  if (!relativePath) return null;
+
+  if (ABSOLUTE_RE.test(relativePath) || relativePath.startsWith('data:') || relativePath.startsWith('blob:')) {
+    return relativePath;
   }
-  
-  const baseUrl = apiClient.defaults.baseURL;
-  
-  const imagePath = relativePath.startsWith('/') 
-    ? relativePath 
-    : `/${relativePath}`;
-    
-  return `${baseUrl}${imagePath}`;
+
+  const base = (apiClient.defaults.baseURL || '').replace(/\/+$/, '');
+  const path = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+  return `${base}${path}`;
 }
