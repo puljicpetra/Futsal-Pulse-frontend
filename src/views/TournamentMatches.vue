@@ -250,20 +250,14 @@
                         <div class="penalty-actions">
                             <button
                                 type="button"
-                                @click="
-                                    newPenalty.outcome = 'scored'
-                                    handleAddPenaltyEvent()
-                                "
+                                @click=";(newPenalty.outcome = 'scored'), handleAddPenaltyEvent()"
                                 class="btn-submit small"
                             >
                                 Scored
                             </button>
                             <button
                                 type="button"
-                                @click="
-                                    newPenalty.outcome = 'missed'
-                                    handleAddPenaltyEvent()
-                                "
+                                @click=";(newPenalty.outcome = 'missed'), handleAddPenaltyEvent()"
                                 class="btn-cancel small"
                             >
                                 Missed

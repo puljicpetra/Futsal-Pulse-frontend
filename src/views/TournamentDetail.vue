@@ -155,31 +155,46 @@
                 </p>
                 <form @submit.prevent="submitNewMatch">
                     <div class="form-group">
+                        <label for="stage">Stage</label>
+                        <select
+                            id="stage"
+                            v-model="newMatch.stage"
+                            required
+                            @change="fetchEligibleTeams"
+                        >
+                            <option disabled value="">Select stage</option>
+                            <option v-for="st in allowedStages" :key="st.stage" :value="st.stage">
+                                {{ stageLabel(st.stage) }}
+                                <span v-if="typeof st.remaining === 'number'"
+                                    >({{ st.remaining }} left)</span
+                                >
+                            </option>
+                        </select>
+                        <small class="text-muted" v-if="newMatch.stage">{{
+                            stageHint(newMatch.stage)
+                        }}</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="teamA">Team A</label>
                         <select id="teamA" v-model="newMatch.teamA_id" required>
                             <option disabled value="">Select Team A</option>
-                            <option
-                                v-for="reg in approvedRegistrations"
-                                :key="reg.team._id"
-                                :value="reg.team._id"
-                            >
-                                {{ reg.team.name }}
+                            <option v-for="t in eligibleTeams" :key="t._id" :value="t._id">
+                                {{ t.name }}
                             </option>
                         </select>
                     </div>
+
                     <div class="form-group">
                         <label for="teamB">Team B</label>
                         <select id="teamB" v-model="newMatch.teamB_id" required>
                             <option disabled value="">Select Team B</option>
-                            <option
-                                v-for="reg in approvedRegistrations"
-                                :key="reg.team._id"
-                                :value="reg.team._id"
-                            >
-                                {{ reg.team.name }}
+                            <option v-for="t in eligibleTeams" :key="t._id" :value="t._id">
+                                {{ t.name }}
                             </option>
                         </select>
                     </div>
+
                     <div class="form-group">
                         <label for="matchDate">Match Date and Time</label>
                         <input
@@ -190,20 +205,12 @@
                             :max="maxDateTime"
                             required
                         />
-                        <small class="text-muted">
-                            Allowed range:
-                            {{ prettyDateTime(minDateTime) }} – {{ prettyDateTime(maxDateTime) }}
-                        </small>
+                        <small class="text-muted"
+                            >Allowed range: {{ prettyDateTime(minDateTime) }} –
+                            {{ prettyDateTime(maxDateTime) }}</small
+                        >
                     </div>
-                    <div class="form-group">
-                        <label for="matchGroup">Group / Stage (optional)</label>
-                        <input
-                            type="text"
-                            id="matchGroup"
-                            v-model="newMatch.group"
-                            placeholder="e.g., Group A, Quarter-final"
-                        />
-                    </div>
+
                     <div class="modal-actions">
                         <button type="button" @click="closeAddMatchModal" class="btn-cancel">
                             Cancel
@@ -249,12 +256,31 @@ const modalError = ref('')
 const showAddMatchModal = ref(false)
 const isSubmittingMatch = ref(false)
 const matchModalError = ref('')
+
+const STAGE_LABELS = {
+    round_of_16: 'Round of 16',
+    quarter: 'Quarter-final',
+    semi: 'Semi-final',
+    third_place: 'Third place',
+    final: 'Final',
+}
+const stageLabel = (s) => STAGE_LABELS[s] || s
+const stageHint = (s) => {
+    if (s === 'semi')
+        return 'Schedule two Semi-finals first. Final and Third place unlock after both finish.'
+    if (s === 'final') return 'Winners of Semi-finals.'
+    if (s === 'third_place') return 'Losers of Semi-finals.'
+    return ''
+}
+
+const allowedStages = ref([])
+const eligibleTeams = ref([])
 const newMatch = ref({
     tournamentId: route.params.id,
+    stage: '',
     teamA_id: '',
     teamB_id: '',
     matchDate: '',
-    group: '',
 })
 
 const teamListComp = ref(null)
@@ -262,10 +288,9 @@ const matchListSummaryComp = ref(null)
 
 const oidString = (v) =>
     typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null)
-
 const idEq = (a, b) => {
-    const sa = oidString(a)
-    const sb = oidString(b)
+    const sa = oidString(a),
+        sb = oidString(b)
     return !!sa && !!sb && sa === sb
 }
 
@@ -350,19 +375,17 @@ const openRegisterModal = () => {
         fetchMyCaptainTeams()
     }
 }
-
 const closeRegisterModal = () => (showRegisterModal.value = false)
 
 const pad2 = (n) => String(n).padStart(2, '0')
 const toLocalInputValue = (d) => {
-    const yyyy = d.getFullYear()
-    const mm = pad2(d.getMonth() + 1)
-    const dd = pad2(d.getDate())
-    const hh = pad2(d.getHours())
-    const min = pad2(d.getMinutes())
-    return `${yyyy}-${mm}-${dd}T${hh}:${min}`
+    const yyyy = d.getFullYear(),
+        mm = pad2(d.getMonth() + 1),
+        dd = pad2(d.getDate())
+    const hh = pad2(d.getHours()),
+        mi = pad2(d.getMinutes())
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`
 }
-
 const parseLocal = (s) => {
     if (!s || typeof s !== 'string') return new Date(NaN)
     const m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
@@ -370,7 +393,6 @@ const parseLocal = (s) => {
     const [, Y, M, D, h, mi] = m.map(Number)
     return new Date(Y, M - 1, D, h, mi, 0, 0)
 }
-
 const minDateTime = computed(() => {
     if (!tournament.value?.startDate) return ''
     const start = new Date(tournament.value.startDate)
@@ -385,7 +407,6 @@ const maxDateTime = computed(() => {
     end.setHours(23, 59, 0, 0)
     return toLocalInputValue(end)
 })
-
 const prettyDateTime = (dt) => {
     if (!dt) return ''
     const locale = navigator.language || undefined
@@ -403,6 +424,38 @@ const prettyDateTime = (dt) => {
     return d.toLocaleString(locale, opts)
 }
 
+const fetchAllowedStages = async () => {
+    allowedStages.value = []
+    try {
+        const { data } = await apiClient.get(`/api/matches/${route.params.id}/allowed-stages`)
+        allowedStages.value = data.allowed || []
+        if (!newMatch.value.stage && allowedStages.value.length) {
+            newMatch.value.stage = allowedStages.value[0].stage
+        }
+    } catch (e) {
+        console.error('fetchAllowedStages error', e)
+        matchModalError.value = e.response?.data?.message || 'Failed to load stages.'
+    }
+}
+
+const fetchEligibleTeams = async () => {
+    eligibleTeams.value = []
+    if (!newMatch.value.stage) return
+    try {
+        const { data } = await apiClient.get(`/api/matches/${route.params.id}/eligible-teams`, {
+            params: { stage: newMatch.value.stage },
+        })
+        eligibleTeams.value = data.teams || []
+        if (!eligibleTeams.value.find((t) => t._id === newMatch.value.teamA_id))
+            newMatch.value.teamA_id = ''
+        if (!eligibleTeams.value.find((t) => t._id === newMatch.value.teamB_id))
+            newMatch.value.teamB_id = ''
+    } catch (e) {
+        console.error('fetchEligibleTeams error', e)
+        matchModalError.value = e.response?.data?.message || 'Failed to load eligible teams.'
+    }
+}
+
 const submitRegistration = async () => {
     isRegisteringTeam.value = true
     modalError.value = ''
@@ -414,9 +467,7 @@ const submitRegistration = async () => {
         closeRegisterModal()
         showFeedback({ type: 'success', text: 'Team successfully registered! Status is pending.' })
         await checkUserRegistration()
-        if (teamListComp.value) {
-            teamListComp.value.fetchRegistrations()
-        }
+        if (teamListComp.value) teamListComp.value.fetchRegistrations()
     } catch (err) {
         modalError.value = err.response?.data?.message || 'Failed to register team.'
     } finally {
@@ -424,18 +475,19 @@ const submitRegistration = async () => {
     }
 }
 
-const openAddMatchModal = () => {
+const openAddMatchModal = async () => {
     showAddMatchModal.value = true
     matchModalError.value = ''
     newMatch.value = {
         tournamentId: route.params.id,
+        stage: '',
         teamA_id: '',
         teamB_id: '',
         matchDate: '',
-        group: '',
     }
+    await fetchAllowedStages()
+    await fetchEligibleTeams()
 }
-
 const closeAddMatchModal = () => (showAddMatchModal.value = false)
 
 const submitNewMatch = async () => {
@@ -447,12 +499,15 @@ const submitNewMatch = async () => {
         matchModalError.value = 'Please choose a date and time.'
         return
     }
+    if (!newMatch.value.stage) {
+        matchModalError.value = 'Please choose a stage.'
+        return
+    }
 
     try {
         const chosen = parseLocal(newMatch.value.matchDate)
         const minD = parseLocal(minDateTime.value)
         const maxD = parseLocal(maxDateTime.value)
-
         if (isNaN(chosen) || isNaN(minD) || isNaN(maxD)) {
             matchModalError.value = 'Invalid date/time.'
             return
@@ -472,14 +527,17 @@ const submitNewMatch = async () => {
     matchModalError.value = ''
     try {
         const payload = {
-            ...newMatch.value,
+            tournamentId: newMatch.value.tournamentId,
+            stage: newMatch.value.stage,
+            teamA_id: newMatch.value.teamA_id,
+            teamB_id: newMatch.value.teamB_id,
             matchDate: parseLocal(newMatch.value.matchDate).toISOString(),
         }
         await apiClient.post('/api/matches', payload)
         closeAddMatchModal()
         showFeedback({ type: 'success', text: 'Match added successfully!' })
         if (matchListSummaryComp.value) {
-            matchListSummaryComp.value.fetchMatchesSummary()
+            matchListSummaryComp.value.fetchMatchesSummary?.()
         }
     } catch (err) {
         matchModalError.value = err.response?.data?.message || 'Failed to create match.'
@@ -509,16 +567,13 @@ onMounted(async () => {
     background-color: #f9f9f9;
     min-height: calc(100vh - 60px);
 }
-
 .tournament-content {
     max-width: 1200px;
     margin: 0 auto;
 }
-
 .navigation-container {
     margin-bottom: 1.5rem;
 }
-
 .back-link {
     display: inline-flex;
     align-items: center;
@@ -529,22 +584,18 @@ onMounted(async () => {
     padding: 0.5rem 1rem;
     border-radius: 20px;
     background-color: #f0f0f0;
-    transition: all 0.2s ease-in-out;
+    transition: all 0.2s;
 }
-
-.back-link i {
-    transition: transform 0.2s ease-in-out;
-}
-
 .back-link:hover {
     background-color: #e0e0e0;
     color: #111;
 }
-
+.back-link i {
+    transition: transform 0.2s;
+}
 .back-link:hover i {
     transform: translateX(-3px);
 }
-
 .tournament-header {
     position: relative;
     text-align: center;
@@ -552,7 +603,6 @@ onMounted(async () => {
     border-bottom: 1px solid #e0e0e0;
     margin-bottom: 2rem;
 }
-
 .actions-container {
     margin-top: 1.5rem;
     display: flex;
@@ -561,7 +611,6 @@ onMounted(async () => {
     flex-wrap: wrap;
     align-items: center;
 }
-
 .btn-edit,
 .btn-delete,
 .btn-register-team {
@@ -575,44 +624,36 @@ onMounted(async () => {
     align-items: center;
     gap: 0.5rem;
 }
-
 .btn-edit {
     background-color: #ffc107;
     color: #212529;
 }
-
 .btn-edit:hover {
     background-color: #e0a800;
     transform: translateY(-2px);
 }
-
 .btn-delete {
     background-color: #dc3545;
-    color: white;
+    color: #fff;
 }
-
 .btn-delete:hover {
     background-color: #c82333;
     transform: translateY(-2px);
 }
-
 .btn-register-team {
     background-color: #00aeef;
-    color: white;
+    color: #fff;
 }
-
 .btn-register-team:hover {
     background-color: #008fbf;
     transform: translateY(-2px);
 }
-
 .tournament-header h1 {
     font-size: 3rem;
     color: #333;
     margin: 0;
     font-weight: 700;
 }
-
 .header-meta {
     display: flex;
     justify-content: center;
@@ -621,37 +662,31 @@ onMounted(async () => {
     color: #777;
     margin-top: 1rem;
 }
-
 .header-meta span {
     display: flex;
     align-items: center;
 }
-
 .header-meta i {
     margin-right: 0.5rem;
     color: #00aeef;
 }
-
 .tournament-body {
     display: grid;
     grid-template-columns: 2fr 1fr;
     gap: 2rem;
     align-items: start;
 }
-
 @media (max-width: 1024px) {
     .tournament-body {
         grid-template-columns: 1fr;
     }
 }
-
 .card {
-    background: white;
+    background: #fff;
     padding: 2rem;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
-
 .card h2 {
     font-size: 1.5rem;
     color: #333;
@@ -661,43 +696,36 @@ onMounted(async () => {
     display: flex;
     align-items: center;
 }
-
 .card h2 i {
     margin-right: 0.75rem;
     color: #00aeef;
 }
-
 .rules-text {
     line-height: 1.7;
     white-space: pre-wrap;
 }
-
 .text-muted {
     color: #888;
     font-style: italic;
 }
-
 .loading-state,
 .error-state {
     text-align: center;
     padding: 5rem 1rem;
 }
-
 .error-state h2 {
     color: #d9534f;
 }
-
 .btn-back {
     display: inline-block;
     margin-top: 1rem;
     padding: 0.7rem 1.5rem;
     background-color: #00aeef;
-    color: white;
+    color: #fff;
     text-decoration: none;
     border-radius: 5px;
     font-weight: bold;
 }
-
 .spinner {
     border: 4px solid #f3f3f3;
     border-top: 4px solid #00aeef;
@@ -707,16 +735,14 @@ onMounted(async () => {
     animation: spin 1s linear infinite;
     margin: 0 auto 1rem;
 }
-
 @keyframes spin {
     0% {
-        transform: rotate(0deg);
+        transform: rotate(0);
     }
     100% {
         transform: rotate(360deg);
     }
 }
-
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -729,35 +755,29 @@ onMounted(async () => {
     align-items: center;
     z-index: 1000;
 }
-
 .modal-content {
-    background: white;
+    background: #fff;
     padding: 2rem;
     border-radius: 12px;
     width: 90%;
     max-width: 500px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
-
 .modal-content h3 {
     margin-top: 0;
 }
-
 .modal-content p {
     color: #666;
     margin-bottom: 1.5rem;
 }
-
 .modal-content .form-group {
     margin-top: 1.5rem;
 }
-
 .modal-content label {
     font-weight: 600;
     margin-bottom: 0.5rem;
     display: block;
 }
-
 .modal-content select,
 .modal-content input {
     width: 100%;
@@ -766,14 +786,12 @@ onMounted(async () => {
     border-radius: 8px;
     box-sizing: border-box;
 }
-
 .modal-actions {
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
     margin-top: 2rem;
 }
-
 .btn-cancel,
 .btn-submit {
     padding: 0.7rem 1.2rem;
@@ -782,43 +800,35 @@ onMounted(async () => {
     cursor: pointer;
     border: none;
 }
-
 .btn-cancel {
     background-color: #f0f0f0;
     border: 1px solid #ccc;
     color: #333;
 }
-
 .btn-submit {
     background-color: #28a745;
-    color: white;
+    color: #fff;
 }
-
 .btn-submit:disabled {
     background-color: #a0a0a0;
     cursor: not-allowed;
 }
-
 .modal-content .error-message {
     color: #dc3545;
     margin-top: 1rem;
     text-align: center;
 }
-
 .small-text {
     font-size: 0.9rem;
     margin-top: 0.5rem;
 }
-
 .small-text a {
     color: #00aeef;
     text-decoration: none;
 }
-
 .small-text a:hover {
     text-decoration: underline;
 }
-
 .feedback-message {
     padding: 0.75rem 1.25rem;
     border-radius: 8px;
@@ -827,22 +837,18 @@ onMounted(async () => {
     font-size: 0.95rem;
     text-align: center;
 }
-
 .feedback-message.success {
     background-color: #d4edda;
     color: #155724;
 }
-
 .feedback-message.error {
     background-color: #f8d7da;
     color: #721c24;
 }
-
 .feedback-message.pending {
     background-color: #fff3cd;
     color: #856404;
 }
-
 .feedback-message.small {
     padding: 0.5rem 1rem;
     margin-top: 0;
