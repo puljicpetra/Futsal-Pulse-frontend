@@ -61,13 +61,20 @@
                         >
                             <div class="match-card">
                                 <div class="match-card-header">
-                                    <span class="tournament-name">{{
-                                        match.tournament?.name || '—'
-                                    }}</span>
-                                    <span v-if="match.group" class="group-badge">{{
-                                        match.group
-                                    }}</span>
+                                    <span class="tournament-name">
+                                        {{ match.tournament?.name || '—' }}
+                                    </span>
+                                    <span
+                                        v-if="match.stage || match.group"
+                                        class="stage-badge"
+                                        :title="
+                                            match.stage ? labelForStage(match.stage) : match.group
+                                        "
+                                    >
+                                        {{ match.stage ? labelForStage(match.stage) : match.group }}
+                                    </span>
                                 </div>
+
                                 <div class="match-card-body">
                                     <div class="team-info team-a">
                                         <span class="team-name">{{
@@ -75,10 +82,10 @@
                                         }}</span>
                                     </div>
                                     <div class="score-info">
-                                        <span class="score"
-                                            >{{ match.score?.teamA ?? '-' }} :
-                                            {{ match.score?.teamB ?? '-' }}</span
-                                        >
+                                        <span class="score">
+                                            {{ match.score?.teamA ?? '-' }} :
+                                            {{ match.score?.teamB ?? '-' }}
+                                        </span>
                                         <span class="match-time">{{
                                             formatTime(match.matchDate)
                                         }}</span>
@@ -127,6 +134,15 @@ const filters = ref({
     tournamentId: null,
     teamId: null,
 })
+
+const LABELS = {
+    round_of_16: 'Round of 16',
+    quarter: 'Quarter-final',
+    semi: 'Semi-final',
+    third_place: 'Third place',
+    final: 'Final',
+}
+const labelForStage = (s) => LABELS[s] || '—'
 
 const toLocalDateKey = (dateString) => {
     const d = new Date(dateString)
@@ -354,6 +370,16 @@ h1 {
 .tournament-name {
     color: #4b5563;
     font-weight: 600;
+}
+
+.stage-badge {
+    font-size: 0.78rem;
+    background: #eef9ff;
+    color: #0078a3;
+    border: 1px solid #cbeefe;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
 }
 
 .group-badge {

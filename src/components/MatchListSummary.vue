@@ -76,10 +76,24 @@
                         Edit Events — {{ currentMatch?.teamA?.name }} vs
                         {{ currentMatch?.teamB?.name }}
                         <span class="chip">{{ labelForStage(currentMatch?.stage) }}</span>
+                        <span v-if="isFinished" class="chip ft">FT</span>
                     </h3>
-                    <button class="icon-btn" @click="closeEditor">
-                        <i class="fas fa-times"></i>
-                    </button>
+
+                    <div class="header-actions">
+                        <button
+                            v-if="!isFinished"
+                            class="btn btn-finish"
+                            :disabled="isFinishing"
+                            @click="finishCurrentMatch"
+                            title="Mark match as finished"
+                        >
+                            <span v-if="isFinishing" class="spinner-sm"></span>
+                            <span v-else>Match finished</span>
+                        </button>
+                        <button class="icon-btn close-btn" @click="closeEditor" title="Close">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="editor-layout">
@@ -142,6 +156,7 @@
                                     {{ isSubmittingEvent ? 'Adding...' : 'Add' }}
                                 </button>
                             </div>
+
                             <p v-if="editorError" class="error-message mt">{{ editorError }}</p>
                             <p v-if="editorSuccess" class="success-message mt">
                                 {{ editorSuccess }}
@@ -215,6 +230,9 @@ const newEvent = ref({ type: 'goal', teamId: '', playerId: '', minute: '' })
 const isSubmittingEvent = ref(false)
 const editorError = ref('')
 const editorSuccess = ref('')
+
+const isFinishing = ref(false)
+const isFinished = computed(() => currentMatch.value?.status === 'finished')
 
 const LABELS = {
     round_of_16: 'Round of 16',
@@ -393,6 +411,27 @@ const removeEvent = async (ev) => {
     } catch (e) {
         console.error('delete event error:', e)
         alert(e.response?.data?.message || 'Failed to remove event.')
+    }
+}
+
+const finishCurrentMatch = async () => {
+    if (!currentMatch.value) return
+    if (!confirm('Mark this match as finished?')) return
+    isFinishing.value = true
+    try {
+        const { data } = await apiClient.patch(`/api/matches/${idOf(currentMatch.value)}/finish`)
+        currentMatch.value = data.match
+        const idx = matches.value.findIndex((mm) => idOf(mm) === idOf(currentMatch.value))
+        if (idx !== -1) {
+            matches.value[idx] = { ...matches.value[idx], status: 'finished' }
+        }
+        editorSuccess.value = 'Match marked as finished.'
+        editorError.value = ''
+    } catch (e) {
+        console.error('finish match error:', e)
+        editorError.value = e.response?.data?.message || 'Failed to finish match.'
+    } finally {
+        isFinishing.value = false
     }
 }
 
@@ -591,6 +630,40 @@ const confirmDelete = async (m) => {
     padding: 0.15rem 0.45rem;
     border-radius: 999px;
 }
+.chip.ft {
+    background: #e5e7eb;
+    color: #111;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.icon-btn.close-btn {
+    background: #fff;
+    border: 1px solid #dcdcdc;
+    color: #111;
+}
+.icon-btn.close-btn:hover {
+    background: #f3f4f6;
+}
+
+.btn-finish {
+    background: #111;
+    color: #fff;
+    border: none;
+    padding: 0.45rem 0.75rem;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.btn-finish:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
 .editor-layout {
     display: grid;
     grid-template-columns: 320px 1fr;
@@ -613,6 +686,7 @@ const confirmDelete = async (m) => {
 .timeline h4 {
     margin: 0 0 0.75rem 0;
 }
+
 .form-row {
     display: grid;
     gap: 0.35rem;
@@ -649,6 +723,7 @@ const confirmDelete = async (m) => {
     background: #9dcaa6;
     cursor: not-allowed;
 }
+
 .mt {
     margin-top: 0.5rem;
 }
@@ -748,9 +823,6 @@ const confirmDelete = async (m) => {
     height: 12px;
     border-radius: 2px;
     border: 1px solid rgba(0, 0, 0, 0.15);
-    box-shadow: none;
-    padding: 0;
-    margin: 0;
 }
 .icon .card-badge.yellow {
     background: #facc15;
