@@ -160,7 +160,6 @@ const fetchMatches = async () => {
         const params = new URLSearchParams()
         if (filters.value.tournamentId) params.append('tournamentId', filters.value.tournamentId)
         if (filters.value.teamId) params.append('teamId', filters.value.teamId)
-
         const qs = params.toString()
         const { data } = await apiClient.get(`/api/matches${qs ? `?${qs}` : ''}`)
         allMatches.value = data || []
@@ -293,7 +292,17 @@ h1 {
     padding: 0.75rem;
     border: 1px solid #d1d5db;
     border-radius: 8px;
-    background-color: #fff;
+    background-color: #fff !important;
+    color: #111 !important;
+}
+.filter-group select option {
+    background: #fff !important;
+    color: #111 !important;
+}
+.filter-group select:focus {
+    border-color: #00aeef;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 174, 239, 0.15);
 }
 
 .filter-actions {
