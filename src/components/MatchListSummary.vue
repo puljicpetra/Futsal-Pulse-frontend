@@ -61,7 +61,14 @@
             </li>
         </ul>
 
-        <div v-if="showEditor" class="modal-overlay" @click.self="closeEditor">
+        <div
+            v-if="showEditor"
+            class="modal-overlay"
+            ref="overlayEl"
+            tabindex="-1"
+            @click.self="closeEditor"
+            @keydown.esc="closeEditor"
+        >
             <div class="modal-content wide">
                 <div class="modal-header">
                     <h3>
@@ -120,7 +127,10 @@
                                 <label>Minute</label>
                                 <input
                                     type="number"
+                                    inputmode="numeric"
+                                    step="1"
                                     min="1"
+                                    max="120"
                                     v-model.number="newEvent.minute"
                                     required
                                     placeholder="e.g., 17"
@@ -159,7 +169,7 @@
                                         <i v-if="ev.type === 'goal'" class="fas fa-futbol"></i>
                                         <span
                                             v-else
-                                            class="card"
+                                            class="card-badge"
                                             :class="ev.type === 'yellow-card' ? 'yellow' : 'red'"
                                         ></span>
                                     </span>
@@ -183,7 +193,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import apiClient from '@/services/api'
 
 const props = defineProps({
@@ -199,6 +209,7 @@ const rootEl = ref(null)
 
 const showEditor = ref(false)
 const currentMatch = ref(null)
+const overlayEl = ref(null)
 
 const newEvent = ref({ type: 'goal', teamId: '', playerId: '', minute: '' })
 const isSubmittingEvent = ref(false)
@@ -233,6 +244,13 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
     document.removeEventListener('click', handleDocClick, true)
+})
+
+watch(showEditor, async (v) => {
+    if (v) {
+        await nextTick()
+        overlayEl.value?.focus()
+    }
 })
 
 function handleDocClick(e) {
@@ -507,7 +525,7 @@ const confirmDelete = async (m) => {
     position: absolute;
     right: 0;
     top: 42px;
-    z-index: 20;
+    z-index: 2000;
     background: #fff;
     border: 1px solid #e6e6e6;
     border-radius: 12px;
@@ -542,6 +560,7 @@ const confirmDelete = async (m) => {
     display: grid;
     place-items: center;
     z-index: 1000;
+    outline: none;
 }
 .modal-content {
     background: #fff;
@@ -665,6 +684,7 @@ const confirmDelete = async (m) => {
         transform: rotate(360deg);
     }
 }
+
 .timeline-list {
     list-style: none;
     padding: 0;
@@ -692,6 +712,7 @@ const confirmDelete = async (m) => {
     order: 1;
     justify-self: start;
 }
+
 .when .minute {
     display: inline-block;
     background: #eef1f4;
@@ -704,11 +725,11 @@ const confirmDelete = async (m) => {
 .bubble {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.3rem;
     background: #fff;
     border: 1px solid #e6eaf0;
     border-radius: 999px;
-    padding: 0.18rem 0.5rem;
+    padding: 0.15rem 0.45rem;
     line-height: 1;
 }
 .icon {
@@ -720,19 +741,26 @@ const confirmDelete = async (m) => {
 .icon i {
     font-size: 0.9rem;
 }
-.icon .card {
-    width: 10px;
-    height: 14px;
-    border-width: 1px;
+
+.icon .card-badge {
+    display: inline-block;
+    width: 9px;
+    height: 12px;
+    border-radius: 2px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
 }
-.icon .card.yellow {
+.icon .card-badge.yellow {
     background: #facc15;
-    border: 1px solid #eab308;
+    border-color: #eab308;
 }
-.icon .card.red {
+.icon .card-badge.red {
     background: #ef4444;
-    border: 1px solid #dc2626;
+    border-color: #dc2626;
 }
+
 .icon-btn {
     background: #f5f6f7;
     border: 1px solid #e6e6e6;
