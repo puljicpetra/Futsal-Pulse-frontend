@@ -60,10 +60,13 @@
             <div v-else-if="tournaments.length > 0" class="tournaments-grid">
                 <div
                     v-for="tournament in tournaments"
-                    :key="tournament._id"
+                    :key="normalizeId(tournament._id)"
                     class="tournament-card"
                 >
-                    <router-link :to="`/tournaments/${tournament._id}`" class="card-image-link">
+                    <router-link
+                        :to="`/tournaments/${normalizeId(tournament._id)}`"
+                        class="card-image-link"
+                    >
                         <div class="card-image-container">
                             <img
                                 v-if="tournament.imageUrl"
@@ -86,17 +89,22 @@
                             {{ tournament.surface }}
                         </span>
                     </div>
+
                     <div class="card-body">
                         <div class="card-info">
                             <p>
-                                <i class="fas fa-map-marker-alt"></i> {{ tournament.location.city }}
+                                <i class="fas fa-map-marker-alt"></i>
+                                {{ tournament.location?.city || '—' }}
                             </p>
                             <p>
                                 <i class="fas fa-calendar-alt"></i>
                                 {{ formatDate(tournament.startDate) }}
                             </p>
                         </div>
-                        <router-link :to="`/tournaments/${tournament._id}`" class="btn-details">
+                        <router-link
+                            :to="`/tournaments/${normalizeId(tournament._id)}`"
+                            class="btn-details"
+                        >
                             View Details
                         </router-link>
                     </div>
@@ -114,12 +122,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import apiClient from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { getImageUrl } from '@/utils/url.js'
 
 const authStore = useAuthStore()
+const route = useRoute()
+const router = useRouter()
+
 const tournaments = ref([])
 const isLoading = ref(true)
 const error = ref('')
@@ -129,6 +141,12 @@ const filters = ref({
     surface: '',
 })
 
+const normalizeId = (id) => {
+    if (!id) return null
+    if (typeof id === 'string') return id
+    if (typeof id === 'object' && typeof id.$oid === 'string') return id.$oid
+    return String(id)
+}
 const normalizeSurface = (s = '') => s.toString().toLowerCase().trim().replace(/\s+/g, '-')
 
 const fetchTournaments = async () => {
@@ -143,19 +161,24 @@ const fetchTournaments = async () => {
         const { data } = await apiClient.get(`/api/tournaments${qs ? `?${qs}` : ''}`)
         tournaments.value = data
     } catch (err) {
-        error.value = err.response?.data?.message || 'Failed to fetch tournaments.'
+        error.value = err?.response?.data?.message || 'Failed to fetch tournaments.'
     } finally {
         isLoading.value = false
     }
 }
 
 const applyFilters = () => {
+    const q = {}
+    if (filters.value.city?.trim()) q.city = filters.value.city.trim()
+    if (filters.value.surface) q.surface = filters.value.surface
+    router.replace({ query: q })
     fetchTournaments()
 }
 
 const clearFilters = () => {
     filters.value.city = ''
     filters.value.surface = ''
+    router.replace({ query: {} })
     fetchTournaments()
 }
 
@@ -167,8 +190,24 @@ const formatDate = (dateString) => {
 }
 
 onMounted(() => {
+    const { city, surface } = route.query
+    filters.value.city = typeof city === 'string' ? city : ''
+    filters.value.surface = typeof surface === 'string' ? surface : ''
     fetchTournaments()
 })
+
+watch(
+    () => route.query,
+    (q) => {
+        const city = typeof q.city === 'string' ? q.city : ''
+        const surface = typeof q.surface === 'string' ? q.surface : ''
+        if (city !== filters.value.city || surface !== filters.value.surface) {
+            filters.value.city = city
+            filters.value.surface = surface
+            fetchTournaments()
+        }
+    }
+)
 </script>
 
 <style scoped>
@@ -177,7 +216,6 @@ onMounted(() => {
     background-color: #f9fafb;
     min-height: calc(100vh - 60px);
 }
-
 .page-content {
     padding: 2rem;
 }
@@ -189,7 +227,6 @@ onMounted(() => {
     padding: 1.5rem 2rem;
     box-sizing: border-box;
 }
-
 .header-content-wrapper {
     max-width: 1200px;
     margin: 0 auto;
@@ -197,7 +234,6 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
 }
-
 h1 {
     color: #111827;
     font-weight: 700;
@@ -217,7 +253,6 @@ h1 {
     align-items: center;
     gap: 0.5rem;
 }
-
 .btn-create:hover {
     background-color: #008fbf;
     box-shadow: 0 4px 15px rgba(0, 174, 239, 0.2);
@@ -236,12 +271,10 @@ h1 {
     gap: 1rem;
     flex-wrap: wrap;
 }
-
 .filter-group {
     flex: 1;
     min-width: 200px;
 }
-
 .filter-group label {
     font-weight: 600;
     color: #374151;
@@ -249,12 +282,10 @@ h1 {
     margin-bottom: 0.5rem;
     display: block;
 }
-
 .filter-group label i {
     margin-right: 0.5rem;
     color: #9ca3af;
 }
-
 .filter-group input,
 .filter-group select {
     width: 100%;
@@ -266,10 +297,7 @@ h1 {
     background-color: #ffffff;
     color: #1f2937;
 }
-
 .filter-group select {
-    -webkit-appearance: none;
-    -moz-appearance: none;
     appearance: none;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
     background-position: right 0.5rem center;
@@ -277,12 +305,10 @@ h1 {
     background-size: 1.5em 1.5em;
     padding-right: 2.5rem;
 }
-
 .filter-actions {
     display: flex;
     gap: 0.5rem;
 }
-
 .btn-filter,
 .btn-clear {
     padding: 0.75rem 1.5rem;
@@ -292,21 +318,17 @@ h1 {
     cursor: pointer;
     transition: background-color 0.2s;
 }
-
 .btn-filter {
     background-color: #374151;
     color: white;
 }
-
 .btn-filter:hover {
     background-color: #1f2937;
 }
-
 .btn-clear {
     background-color: #e5e7eb;
     color: #374151;
 }
-
 .btn-clear:hover {
     background-color: #d1d5db;
 }
@@ -316,13 +338,11 @@ h1 {
     grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
 }
-
 @media (max-width: 1024px) {
     .tournaments-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }
-
 @media (max-width: 768px) {
     .tournaments-grid {
         grid-template-columns: 1fr;
@@ -343,7 +363,6 @@ h1 {
     flex-direction: column;
     transition: transform 0.3s, box-shadow 0.3s;
 }
-
 .tournament-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
@@ -388,7 +407,6 @@ h1 {
     align-items: center;
     border-radius: 0;
 }
-
 .card-header h3 {
     margin: 0;
     font-size: 1.25rem;
@@ -403,19 +421,16 @@ h1 {
     flex-direction: column;
     flex-grow: 1;
 }
-
 .card-info {
     color: #4b5563;
     flex-grow: 1;
     margin-bottom: 1.5rem;
 }
-
 .card-info p {
     margin: 0.5rem 0;
     display: flex;
     align-items: center;
 }
-
 .card-info i {
     margin-right: 0.75rem;
     color: #00aeef;
@@ -434,7 +449,6 @@ h1 {
     transition: background-color 0.3s;
     margin-top: auto;
 }
-
 .btn-details:hover {
     background-color: #111827;
 }
@@ -447,7 +461,6 @@ h1 {
     text-transform: capitalize;
     margin-left: 0.5rem;
 }
-
 .surface-parket {
     background-color: #fef3c7;
     color: #92400e;
@@ -476,7 +489,6 @@ h1 {
     padding: 4rem 1rem;
     color: #6b7280;
 }
-
 .error-state h2,
 .empty-state h2 {
     color: #1f2937;
@@ -489,13 +501,11 @@ h1 {
     border: 1px solid #e5e7eb;
     border-radius: 12px;
 }
-
 .empty-state-icon {
     font-size: 3rem;
     color: #d1d5db;
     margin-bottom: 1rem;
 }
-
 .empty-state .create-link,
 .btn-clear-main {
     font-weight: 600;
@@ -506,7 +516,6 @@ h1 {
     padding: 0;
     cursor: pointer;
 }
-
 .empty-state .create-link:hover,
 .btn-clear-main:hover {
     text-decoration: underline;
@@ -521,7 +530,6 @@ h1 {
     animation: spin 1s linear infinite;
     margin: 0 auto 1rem;
 }
-
 @keyframes spin {
     0% {
         transform: rotate(0deg);
@@ -541,7 +549,6 @@ h1 {
     border: none;
     cursor: pointer;
 }
-
 .btn-retry:hover {
     background-color: #d1d5db;
 }

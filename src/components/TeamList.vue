@@ -5,23 +5,23 @@
         <div v-if="isLoading" class="loading-state-small">Loading teams...</div>
 
         <ul v-else-if="registrations.length > 0" class="teams-list">
-            <li v-for="reg in registrations" :key="reg._id" class="team-item">
+            <li v-for="reg in registrations" :key="normalizeId(reg._id)" class="team-item">
                 <div class="team-item-main">
                     <i class="fas fa-shield-alt"></i>
                     <div class="team-info">
                         <span class="team-name">{{ reg.team?.name }}</span>
                         <span class="captain-info">
-                            Captain: {{ reg.captain?.full_name || reg.captain?.username }}
+                            Captain: {{ reg.captain?.fullName || reg.captain?.username }}
                         </span>
                     </div>
                 </div>
 
                 <div class="team-item-actions">
-                    <span class="status-badge" :class="`status-${reg.status}`">{{
-                        formatStatus(reg.status)
-                    }}</span>
+                    <span class="status-badge" :class="`status-${reg.status}`">
+                        {{ formatStatus(reg.status) }}
+                    </span>
 
-                    <div v-if="isCaptainOf(reg.team._id)" class="captain-team-actions">
+                    <div v-if="isCaptainOfReg(reg)" class="captain-team-actions">
                         <button
                             v-if="reg.status === 'approved'"
                             @click="requestTeamWithdrawal(reg._id)"
@@ -82,22 +82,34 @@ const emit = defineEmits(['feedback', 'registrations-loaded'])
 
 const authStore = useAuthStore()
 const registrations = ref([])
-const myTeams = ref([])
 const isLoading = ref(true)
 
-const isCaptainOf = (teamId) => {
-    if (authStore.userRole !== 'player') return false
-    return myTeams.value?.some((team) => team._id === teamId && team.captain === authStore.userId)
+const oidString = (v) =>
+    typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null)
+
+const normalizeId = (id) => {
+    const s = oidString(id)
+    return s ?? ''
+}
+
+const idEq = (a, b) => {
+    const sa = oidString(a)
+    const sb = oidString(b)
+    return !!sa && !!sb && sa === sb
+}
+
+const isCaptainOfReg = (reg) => {
+    return idEq(reg?.captain?._id, authStore.userId)
 }
 
 const fetchRegistrations = async () => {
     isLoading.value = true
     try {
-        const { data } = await apiClient.get(
-            `/api/registrations?tournamentId=${props.tournamentId}`
-        )
-        registrations.value = data
-        emit('registrations-loaded', data)
+        const { data } = await apiClient.get('/api/registrations', {
+            params: { tournamentId: props.tournamentId },
+        })
+        registrations.value = Array.isArray(data) ? data : []
+        emit('registrations-loaded', registrations.value)
     } catch (err) {
         console.error('Failed to fetch registrations:', err)
         emit('feedback', { type: 'error', text: 'Could not load registered teams.' })
@@ -106,19 +118,11 @@ const fetchRegistrations = async () => {
     }
 }
 
-const fetchMyTeams = async () => {
-    if (authStore.userRole !== 'player') return
-    try {
-        const { data } = await apiClient.get('/api/teams')
-        myTeams.value = data
-    } catch (err) {
-        console.error("Failed to fetch user's teams:", err)
-    }
-}
-
 const updateRegistrationStatus = async (registrationId, newStatus) => {
     try {
-        await apiClient.patch(`/api/registrations/${registrationId}`, { status: newStatus })
+        await apiClient.patch(`/api/registrations/${normalizeId(registrationId)}`, {
+            status: newStatus,
+        })
         await fetchRegistrations()
         emit('feedback', {
             type: 'success',
@@ -142,9 +146,12 @@ const requestTeamWithdrawal = async (registrationId) => {
         emit('feedback', { type: '', text: '' })
         try {
             const res = await apiClient.post(
-                `/api/registrations/${registrationId}/request-withdrawal`
+                `/api/registrations/${normalizeId(registrationId)}/request-withdrawal`
             )
-            emit('feedback', { type: 'success', text: res.data.message })
+            emit('feedback', {
+                type: 'success',
+                text: res.data?.message || 'Withdrawal requested.',
+            })
             await fetchRegistrations()
         } catch (err) {
             console.error('Failed to request withdrawal:', err)
@@ -170,9 +177,6 @@ const formatStatus = (status) => {
 
 onMounted(() => {
     fetchRegistrations()
-    if (authStore.userRole === 'player') {
-        fetchMyTeams()
-    }
 })
 
 defineExpose({ fetchRegistrations })

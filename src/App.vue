@@ -57,13 +57,12 @@ const formattedUserRole = computed(() => {
                             <li class="nav-item">
                                 <router-link to="/matches" class="nav-link">Matches</router-link>
                             </li>
-                            <li class="nav-item" v-if="authStore.userRole === 'player'">
+                            <li class="nav-item">
                                 <router-link to="/teams" class="nav-link">Teams</router-link>
                             </li>
                         </ul>
                         <div class="d-flex align-items-center ms-auto" v-if="authStore.isLoggedIn">
                             <NotificationBell />
-
                             <div class="nav-item dropdown">
                                 <a
                                     class="nav-link dropdown-toggle user-dropdown-toggle"
@@ -228,13 +227,11 @@ nav.navbar {
     align-items: center;
     transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
 }
-
 .logout-button-dropdown:hover,
 .logout-button-dropdown:focus {
     color: #fff;
     background-color: #dc3545;
 }
-
 .logout-button-dropdown:hover i,
 .logout-button-dropdown:focus i {
     color: #fff;

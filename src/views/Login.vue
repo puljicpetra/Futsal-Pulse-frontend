@@ -27,8 +27,12 @@
 <script setup>
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useRoute, useRouter } from 'vue-router'
 
 const authStore = useAuthStore()
+const route = useRoute()
+const router = useRouter()
+
 const username = ref('')
 const password = ref('')
 const error = ref('')
@@ -41,9 +45,28 @@ async function login() {
     error.value = ''
 
     try {
-        await authStore.login(username.value, password.value)
+        const uname = username.value.trim()
+        const pwd = password.value
+        if (!uname || !pwd) {
+            error.value = 'Please enter username and password.'
+            return
+        }
+
+        await authStore.login(uname, pwd)
+
+        const dest =
+            typeof route.query.redirect === 'string' && route.query.redirect
+                ? route.query.redirect
+                : '/'
+        if (dest !== '/') {
+            router.push(dest)
+        }
     } catch (err) {
-        error.value = 'Invalid login credentials. Please try again.'
+        error.value =
+            err?.response?.data?.message ||
+            (Array.isArray(err?.response?.data?.errors)
+                ? err.response.data.errors.map((e) => e.msg || e.message).join(' • ')
+                : 'Invalid login credentials. Please try again.')
     } finally {
         isLoggingIn.value = false
     }
@@ -80,7 +103,6 @@ async function login() {
     border-radius: 10px;
     border: 1px solid #fff;
 }
-
 .glass-container::before {
     content: '';
     position: absolute;
@@ -97,19 +119,16 @@ async function login() {
     margin: 0 auto;
     text-align: center;
 }
-
 h2 {
     color: #fff;
     margin-top: 30px;
     margin-bottom: -20px;
 }
-
 form {
     display: flex;
     flex-direction: column;
     margin-top: 20px;
 }
-
 input {
     padding: 10px;
     margin-top: 25px;
@@ -120,15 +139,12 @@ input {
     color: #fff;
     font-size: 13px;
 }
-
 input::placeholder {
     color: #fff;
 }
-
 input:focus {
     outline: none;
 }
-
 button {
     background: #fff;
     color: black;
@@ -138,31 +154,26 @@ button {
     cursor: pointer;
     margin-top: 15px;
 }
-
 button:hover {
     background: transparent;
     color: white;
     outline: 1px solid #fff;
 }
-
 button:disabled {
     background-color: #ccc;
     cursor: not-allowed;
 }
-
 p {
     font-size: 12px;
     color: #fff;
     margin-top: 15px;
 }
-
 #error,
 .error-message {
     color: red;
     font-size: 12px;
     margin-top: 5px;
 }
-
 #register {
     text-decoration: none;
     color: #fff;

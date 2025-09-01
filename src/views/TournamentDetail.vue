@@ -86,7 +86,7 @@
 
                     <TeamList
                         ref="teamListComp"
-                        :tournamentId="tournament._id"
+                        :tournamentId="normalizeId(tournament._id)"
                         :isOwner="isOwner"
                         @feedback="showFeedback"
                         @registrations-loaded="handleRegistrationsLoaded"
@@ -96,7 +96,7 @@
                 <aside class="sidebar-content">
                     <MatchListSummary
                         ref="matchListSummaryComp"
-                        :tournamentId="tournament._id"
+                        :tournamentId="normalizeId(tournament._id)"
                         :isOwner="isOwner"
                         @add-match="openAddMatchModal"
                     />
@@ -115,8 +115,8 @@
                             <option disabled value="">Select a team...</option>
                             <option
                                 v-for="team in myCaptainTeams"
-                                :key="team._id"
-                                :value="team._id"
+                                :key="normalizeId(team._id)"
+                                :value="normalizeId(team._id)"
                             >
                                 {{ team.name }}
                             </option>
@@ -179,7 +179,11 @@
                         <label for="teamA">Team A</label>
                         <select id="teamA" v-model="newMatch.teamA_id" required>
                             <option disabled value="">Select Team A</option>
-                            <option v-for="t in eligibleTeams" :key="t._id" :value="t._id">
+                            <option
+                                v-for="t in eligibleTeams"
+                                :key="normalizeId(t._id)"
+                                :value="t._id"
+                            >
                                 {{ t.name }}
                             </option>
                         </select>
@@ -189,7 +193,11 @@
                         <label for="teamB">Team B</label>
                         <select id="teamB" v-model="newMatch.teamB_id" required>
                             <option disabled value="">Select Team B</option>
-                            <option v-for="t in eligibleTeams" :key="t._id" :value="t._id">
+                            <option
+                                v-for="t in eligibleTeams"
+                                :key="normalizeId(t._id)"
+                                :value="t._id"
+                            >
                                 {{ t.name }}
                             </option>
                         </select>
@@ -286,6 +294,12 @@ const newMatch = ref({
 const teamListComp = ref(null)
 const matchListSummaryComp = ref(null)
 
+const normalizeId = (id) => {
+    if (!id) return null
+    if (typeof id === 'string') return id
+    if (typeof id === 'object' && typeof id.$oid === 'string') return id.$oid
+    return String(id)
+}
 const oidString = (v) =>
     typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null)
 const idEq = (a, b) => {
@@ -318,7 +332,7 @@ const fetchMyCaptainTeams = async () => {
     if (authStore.userRole !== 'player') return
     isLoadingMyTeams.value = true
     try {
-        const { data } = await apiClient.get('/api/teams')
+        const { data } = await apiClient.get('/api/teams/me')
         myCaptainTeams.value = (data || []).filter((t) => idEq(t.captain, authStore.userId))
     } catch (err) {
         console.error("Failed to fetch user's captained teams:", err)
@@ -351,12 +365,12 @@ const handleRegistrationsLoaded = (loadedRegistrations) => {
     approvedRegistrations.value = loadedRegistrations.filter((r) => r.status === 'approved')
 }
 
-const goToEdit = () => router.push(`/tournaments/${tournament.value._id}/edit`)
+const goToEdit = () => router.push(`/tournaments/${normalizeId(tournament.value._id)}/edit`)
 
 const confirmDelete = async () => {
     if (window.confirm('Are you sure you want to permanently delete this tournament?')) {
         try {
-            await apiClient.delete(`/api/tournaments/${tournament.value._id}`)
+            await apiClient.delete(`/api/tournaments/${normalizeId(tournament.value._id)}`)
             router.push('/tournaments')
         } catch (err) {
             showFeedback({
@@ -462,7 +476,7 @@ const submitRegistration = async () => {
     try {
         await apiClient.post('/api/registrations', {
             teamId: selectedTeamId.value,
-            tournamentId: tournament.value._id,
+            tournamentId: normalizeId(tournament.value._id),
         })
         closeRegisterModal()
         showFeedback({ type: 'success', text: 'Team successfully registered! Status is pending.' })
