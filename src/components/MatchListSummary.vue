@@ -16,7 +16,7 @@
         <p v-else-if="matches.length === 0" class="text-muted">No matches yet.</p>
 
         <ul v-else class="match-list">
-            <li v-for="m in matches" :key="idOf(m)" class="match-row">
+            <li v-for="m in matches" :key="m._id" class="match-row">
                 <div class="match-main">
                     <div class="teams">
                         <div class="team side-a">
@@ -27,34 +27,14 @@
                             <div class="stage-chip" :title="toStageTitle(m.stage)">
                                 {{ labelForStage(m.stage) }}
                             </div>
-
                             <div class="score">
-                                <span class="n">{{ m.score?.teamA ?? 0 }}</span>
+                                <span class="n">{{ totalScore(m).a }}</span>
                                 <span class="dash">-</span>
-                                <span class="n">{{ m.score?.teamB ?? 0 }}</span>
-                                <span
-                                    v-if="m.result_type === 'penalties' && m.penalty_shootout"
-                                    class="pens-note"
-                                >
-                                    ({{ m.penalty_shootout.teamA_goals ?? 0 }}–{{
-                                        m.penalty_shootout.teamB_goals ?? 0
-                                    }})
-                                </span>
+                                <span class="n">{{ totalScore(m).b }}</span>
+                                <small class="suffix">{{ resultSuffix(m) }}</small>
                             </div>
-
                             <div class="status">
-                                <template v-if="m.status === 'finished'">
-                                    FT
-                                    <span class="rt-chip" v-if="m.result_type === 'overtime'"
-                                        >AET</span
-                                    >
-                                    <span class="rt-chip" v-else-if="m.result_type === 'penalties'"
-                                        >PENS</span
-                                    >
-                                </template>
-                                <template v-else>
-                                    {{ prettyDateTime(m.matchDate) }}
-                                </template>
+                                {{ m.status === 'finished' ? 'FT' : prettyDateTime(m.matchDate) }}
                             </div>
                         </div>
 
@@ -231,6 +211,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import apiClient from '@/services/api'
+import { totalScore, resultSuffix } from '@/utils/match'
 
 const props = defineProps({
     tournamentId: { type: String, required: true },
@@ -311,7 +292,6 @@ const idOf = (obj) => {
     if (!raw) return ''
     return typeof raw === 'string' ? raw : raw?.$oid ?? String(raw)
 }
-
 const labelForStage = (s) => LABELS[s] || '—'
 const toStageTitle = (s) => labelForStage(s)
 const prettyDateTime = (iso) => {
@@ -402,8 +382,8 @@ const submitEvent = async () => {
                 score: currentMatch.value.score,
                 overtime_score: currentMatch.value.overtime_score,
                 penalty_shootout: currentMatch.value.penalty_shootout,
-                result_type: currentMatch.value.result_type,
                 status: currentMatch.value.status,
+                result_type: currentMatch.value.result_type,
             }
         }
         editorSuccess.value = 'Event added.'
@@ -430,8 +410,8 @@ const removeEvent = async (ev) => {
                 score: currentMatch.value.score,
                 overtime_score: currentMatch.value.overtime_score,
                 penalty_shootout: currentMatch.value.penalty_shootout,
-                result_type: currentMatch.value.result_type,
                 status: currentMatch.value.status,
+                result_type: currentMatch.value.result_type,
             }
         }
     } catch (e) {
@@ -544,12 +524,14 @@ const confirmDelete = async (m) => {
     font-size: 1.2rem;
     font-weight: 800;
     color: #111;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
 }
-.score-block .score .pens-note {
-    font-size: 0.85rem;
+.score-block .score .suffix {
+    font-size: 0.8rem;
     font-weight: 600;
-    margin-left: 6px;
-    color: #374151;
+    color: #666;
 }
 .score-block .status {
     font-size: 0.8rem;
@@ -568,16 +550,6 @@ const confirmDelete = async (m) => {
     padding: 0.15rem 0.45rem;
     border-radius: 999px;
     white-space: nowrap;
-}
-
-.rt-chip {
-    font-size: 0.68rem;
-    background: #e9ecef;
-    color: #1f2937;
-    padding: 0.05rem 0.35rem;
-    border-radius: 999px;
-    margin-left: 6px;
-    border: 1px solid #d7dbe0;
 }
 
 .row-actions {

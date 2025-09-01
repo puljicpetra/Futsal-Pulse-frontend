@@ -23,18 +23,26 @@
                 <div class="team-banner">
                     <span class="team-name">{{ match.teamA?.name || 'TBD' }}</span>
                 </div>
+
                 <div class="score-display">
-                    <span class="final-score"
-                        >{{ finalScore(match).teamA }} - {{ finalScore(match).teamB }}</span
-                    >
-                    <div
-                        v-if="match.result_type === 'penalties' && match.penalty_shootout"
-                        class="penalty-result"
-                    >
+                    <span class="final-score">
+                        {{ total.a }} - {{ total.b }}
+                        <small v-if="suffix" class="score-suffix">{{ suffix }}</small>
+                    </span>
+                    <div class="meta-line">
+                        <span v-if="match.status === 'finished'">FT</span>
+                        <span v-else>{{ prettyDateTime(match.matchDate) }}</span>
+                        <span v-if="match.stage" class="stage-chip">{{
+                            labelForStage(match.stage)
+                        }}</span>
+                    </div>
+
+                    <div v-if="match.penalty_shootout && showPenLine" class="penalty-result">
                         Penalties: {{ match.penalty_shootout.teamA_goals }} -
                         {{ match.penalty_shootout.teamB_goals }}
                     </div>
                 </div>
+
                 <div class="team-banner">
                     <span class="team-name">{{ match.teamB?.name || 'TBD' }}</span>
                 </div>
@@ -42,23 +50,22 @@
 
             <div class="match-body">
                 <h3>Match Timeline</h3>
+
                 <div class="timeline-container">
                     <div class="period-header">1st Half</div>
 
                     <template
                         v-for="(event, index) in allEventsSorted"
                         :key="
-                            event._id || `${event.type}-${event.playerId}-${event.minute}-${index}`
+                            event._id ||
+                            `${event.type}-${idOf(event.playerId)}-${event.minute}-${index}`
                         "
                     >
                         <div v-if="shouldShowHeader(event, index)" class="period-header">
                             {{ shouldShowHeader(event, index) }}
                         </div>
 
-                        <div
-                            class="timeline-entry"
-                            :class="event.teamId === match.teamB._id ? 'right' : 'left'"
-                        >
+                        <div class="timeline-entry" :class="isTeamBEvent(event) ? 'right' : 'left'">
                             <div class="event-details">
                                 <i :class="getEventIcon(event.type)"></i>
                                 <span class="player-name">{{ getPlayerName(event.playerId) }}</span>
@@ -74,7 +81,9 @@
                         <div class="timeline-col">
                             <div
                                 v-for="(event, i) in teamA_penalties"
-                                :key="event._id || `${event.playerId}-${event.outcome}-A-${i}`"
+                                :key="
+                                    event._id || `${idOf(event.playerId)}-${event.outcome}-A-${i}`
+                                "
                                 class="event-row-split"
                             >
                                 <span>{{ getPlayerName(event.playerId) }}</span>
@@ -84,7 +93,9 @@
                         <div class="timeline-col right-aligned">
                             <div
                                 v-for="(event, i) in teamB_penalties"
-                                :key="event._id || `${event.playerId}-${event.outcome}-B-${i}`"
+                                :key="
+                                    event._id || `${idOf(event.playerId)}-${event.outcome}-B-${i}`
+                                "
                                 class="event-row-split"
                             >
                                 <i :class="getPenaltyIcon(event.outcome)"></i>
@@ -102,13 +113,26 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import apiClient from '@/services/api'
+import { totalScore, resultSuffix } from '@/utils/match'
 
 const route = useRoute()
 const match = ref(null)
 const isLoading = ref(true)
 const error = ref('')
 
-const allPlayers = ref(new Map())
+const idOf = (obj) => {
+    if (!obj) return ''
+    if (typeof obj === 'string') return obj
+    const raw = obj._id ?? obj.id ?? obj.$oid
+    return typeof raw === 'string' ? raw : raw?.$oid ?? String(raw ?? '')
+}
+
+const playerMap = ref(new Map())
+const buildPlayerMap = (m) => {
+    playerMap.value.clear()
+    m?.teamA?.players?.forEach((p) => playerMap.value.set(idOf(p._id), p))
+    m?.teamB?.players?.forEach((p) => playerMap.value.set(idOf(p._id), p))
+}
 
 const fetchMatchDetails = async () => {
     isLoading.value = true
@@ -116,10 +140,7 @@ const fetchMatchDetails = async () => {
     try {
         const { data } = await apiClient.get(`/api/matches/${route.params.id}`)
         match.value = data
-
-        allPlayers.value.clear()
-        match.value?.teamA?.players?.forEach((p) => allPlayers.value.set(p._id, p))
-        match.value?.teamB?.players?.forEach((p) => allPlayers.value.set(p._id, p))
+        buildPlayerMap(match.value)
     } catch (err) {
         error.value = err.response?.data?.message || 'Failed to fetch match details.'
     } finally {
@@ -127,41 +148,40 @@ const fetchMatchDetails = async () => {
     }
 }
 
-const finalScore = (m) => {
-    if (!m) return { teamA: '-', teamB: '-' }
-    let final = { teamA: m.score?.teamA ?? 0, teamB: m.score?.teamB ?? 0 }
-    if (m.overtime_score) {
-        final.teamA += m.overtime_score.teamA
-        final.teamB += m.overtime_score.teamB
-    }
-    return final
-}
+const total = computed(() => totalScore(match.value))
+const suffix = computed(() => resultSuffix(match.value))
+const showPenLine = computed(
+    () =>
+        !!match.value?.penalty_shootout &&
+        typeof match.value.penalty_shootout.teamA_goals === 'number' &&
+        typeof match.value.penalty_shootout.teamB_goals === 'number'
+)
 
 const allEventsSorted = computed(() => {
     const ev = match.value?.events ?? []
-    return [...ev].sort((a, b) => a.minute - b.minute)
+    return [...ev].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0))
 })
-
 const penaltyEvents = computed(() => match.value?.penalty_shootout?.events || [])
 const teamA_penalties = computed(() =>
     (match.value?.penalty_shootout?.events || []).filter(
-        (e) => e.teamId === match.value?.teamA?._id
+        (e) => idOf(e.teamId) === idOf(match.value?.teamA)
     )
 )
 const teamB_penalties = computed(() =>
     (match.value?.penalty_shootout?.events || []).filter(
-        (e) => e.teamId === match.value?.teamB?._id
+        (e) => idOf(e.teamId) === idOf(match.value?.teamB)
     )
 )
 
 const shouldShowHeader = (currentEvent, index) => {
     if (index === 0) return null
     const prevEvent = allEventsSorted.value[index - 1]
-    if (prevEvent.minute <= 20 && currentEvent.minute > 20) return '2nd Half'
-    if (prevEvent.minute <= 40 && currentEvent.minute > 40) return 'Overtime'
+    if ((prevEvent.minute ?? 0) <= 20 && (currentEvent.minute ?? 0) > 20) return '2nd Half'
+    if ((prevEvent.minute ?? 0) <= 40 && (currentEvent.minute ?? 0) > 40) return 'Overtime'
     return null
 }
 
+const isTeamBEvent = (event) => idOf(event.teamId) === idOf(match.value?.teamB)
 const getEventIcon = (type) =>
     ({
         goal: 'fas fa-futbol',
@@ -170,7 +190,31 @@ const getEventIcon = (type) =>
     }[type] || 'fas fa-question')
 const getPenaltyIcon = (outcome) =>
     outcome === 'scored' ? 'fas fa-check-circle' : 'fas fa-times-circle'
-const getPlayerName = (playerId) => allPlayers.value.get(playerId)?.name || 'Unknown'
+const getPlayerName = (playerId) =>
+    playerMap.value.get(idOf(playerId))?.name ||
+    playerMap.value.get(idOf(playerId))?.full_name ||
+    'Unknown'
+
+const LABELS = {
+    round_of_16: 'Round of 16',
+    quarter: 'Quarter-final',
+    semi: 'Semi-final',
+    third_place: 'Third place',
+    final: 'Final',
+}
+const labelForStage = (s) => LABELS[s] || '—'
+const prettyDateTime = (iso) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    const locale = navigator.language || undefined
+    return d.toLocaleString(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    })
+}
 
 onMounted(fetchMatchDetails)
 </script>
@@ -199,7 +243,6 @@ onMounted(fetchMatchDetails)
     background-color: #f0f0f0;
     transition: all 0.2s ease-in-out;
 }
-
 .back-link:hover {
     background-color: #e0e0e0;
 }
@@ -214,12 +257,10 @@ onMounted(fetchMatchDetails)
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
     margin-bottom: 2rem;
 }
-
 .team-banner {
     flex: 1;
     text-align: center;
 }
-
 .team-name {
     font-size: 1.5rem;
     font-weight: bold;
@@ -230,11 +271,32 @@ onMounted(fetchMatchDetails)
     text-align: center;
     padding: 0 2rem;
 }
-
 .final-score {
     font-size: 3.5rem;
     font-weight: 700;
     color: #111827;
+}
+.score-suffix {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #6b7280;
+    margin-left: 0.35rem;
+}
+.meta-line {
+    margin-top: 0.35rem;
+    color: #6b7280;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    align-items: center;
+}
+.stage-chip {
+    font-size: 0.75rem;
+    background: #eef9ff;
+    color: #0078a3;
+    border: 1px solid #cbeefe;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
 }
 
 .penalty-result {
@@ -249,30 +311,25 @@ onMounted(fetchMatchDetails)
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
-
 .match-body h3 {
     text-align: center;
     font-size: 1.5rem;
-    margin-top: 0;
-    margin-bottom: 2rem;
+    margin: 0 0 2rem 0;
 }
 
 .timeline-container {
     display: flex;
     flex-direction: column;
 }
-
 .timeline-entry {
     display: flex;
     align-items: center;
     position: relative;
     min-height: 50px;
 }
-
 .timeline-entry.left {
     justify-content: flex-start;
 }
-
 .timeline-entry.right {
     justify-content: flex-end;
 }
@@ -283,7 +340,6 @@ onMounted(fetchMatchDetails)
     gap: 0.75rem;
     width: 45%;
 }
-
 .timeline-entry.right .event-details {
     justify-content: flex-end;
     flex-direction: row-reverse;
@@ -308,7 +364,6 @@ onMounted(fetchMatchDetails)
 .penalty-timeline {
     margin-top: 2rem;
 }
-
 .period-header {
     text-align: center;
     font-weight: bold;
@@ -335,7 +390,6 @@ onMounted(fetchMatchDetails)
     text-align: center;
     padding: 5rem 1rem;
 }
-
 .spinner {
     border: 4px solid #f3f4f6;
     border-top: 4px solid #00aeef;
@@ -345,10 +399,9 @@ onMounted(fetchMatchDetails)
     animation: spin 1s linear infinite;
     margin: 0 auto 1rem;
 }
-
 @keyframes spin {
     0% {
-        transform: rotate(0deg);
+        transform: rotate(0);
     }
     100% {
         transform: rotate(360deg);
@@ -359,25 +412,21 @@ onMounted(fetchMatchDetails)
     display: flex;
     justify-content: space-between;
 }
-
 .timeline-col {
     width: 48%;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
 }
-
 .event-row-split {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     font-size: 1rem;
 }
-
 .timeline-col.right-aligned {
     text-align: right;
 }
-
 .timeline-col.right-aligned .event-row-split {
     justify-content: flex-end;
     flex-direction: row-reverse;

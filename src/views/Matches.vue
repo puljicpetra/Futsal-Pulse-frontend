@@ -81,15 +81,32 @@
                                             match.teamA?.name || 'TBD'
                                         }}</span>
                                     </div>
+
                                     <div class="score-info">
                                         <span class="score">
-                                            {{ match.score?.teamA ?? '-' }} :
-                                            {{ match.score?.teamB ?? '-' }}
+                                            <template
+                                                v-if="
+                                                    match.status === 'finished' ||
+                                                    (match.events && match.events.length)
+                                                "
+                                            >
+                                                {{ totalScore(match).a }} :
+                                                {{ totalScore(match).b }}
+                                                <small class="suffix">{{
+                                                    resultSuffix(match)
+                                                }}</small>
+                                            </template>
+                                            <template v-else>— : —</template>
                                         </span>
-                                        <span class="match-time">{{
-                                            formatTime(match.matchDate)
-                                        }}</span>
+                                        <span class="match-time">
+                                            {{
+                                                match.status === 'finished'
+                                                    ? 'FT'
+                                                    : formatTime(match.matchDate)
+                                            }}
+                                        </span>
                                     </div>
+
                                     <div class="team-info team-b">
                                         <span class="team-name">{{
                                             match.teamB?.name || 'TBD'
@@ -122,6 +139,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import apiClient from '@/services/api'
+import { totalScore, resultSuffix } from '@/utils/match'
 
 const route = useRoute()
 const allMatches = ref([])
@@ -391,13 +409,6 @@ h1 {
     white-space: nowrap;
 }
 
-.group-badge {
-    background-color: #e9ecef;
-    color: #495057;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-}
-
 .match-card-body {
     display: flex;
     align-items: center;
@@ -423,12 +434,21 @@ h1 {
 .score {
     font-size: 1.75rem;
     font-weight: 700;
-    display: block;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.score .suffix {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #6b7280;
 }
 
 .match-time {
     font-size: 0.9rem;
     color: #6b7280;
+    display: block;
+    margin-top: 0.15rem;
 }
 
 .empty-state,
