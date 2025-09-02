@@ -145,11 +145,14 @@
                                     inputmode="numeric"
                                     step="1"
                                     min="1"
-                                    max="120"
+                                    max="50"
                                     v-model.number="newEvent.minute"
                                     required
                                     placeholder="e.g., 17"
                                 />
+                                <small class="text-muted"
+                                    >Regular 1–40, Overtime 41–50 (only if 1–40 ended draw)</small
+                                >
                             </div>
                             <div class="form-actions">
                                 <button class="btn btn-success" :disabled="isSubmittingEvent">
@@ -161,6 +164,62 @@
                             <p v-if="editorError" class="error-message mt">{{ editorError }}</p>
                             <p v-if="editorSuccess" class="success-message mt">
                                 {{ editorSuccess }}
+                            </p>
+                        </form>
+
+                        <hr class="sep" />
+
+                        <h4>Add Penalty</h4>
+                        <form @submit.prevent="submitPenalty">
+                            <div class="form-row">
+                                <label>Team</label>
+                                <select
+                                    v-model="newPenalty.teamId"
+                                    required
+                                    @change="onPenaltyTeam"
+                                >
+                                    <option disabled value="">Select team</option>
+                                    <option :value="idOf(currentMatch.teamA)">
+                                        {{ currentMatch.teamA?.name }}
+                                    </option>
+                                    <option :value="idOf(currentMatch.teamB)">
+                                        {{ currentMatch.teamB?.name }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label>Player</label>
+                                <select
+                                    v-model="newPenalty.playerId"
+                                    required
+                                    :disabled="penaltyPlayers.length === 0"
+                                >
+                                    <option disabled value="">Select player</option>
+                                    <option
+                                        v-for="p in penaltyPlayers"
+                                        :key="idOf(p)"
+                                        :value="idOf(p)"
+                                    >
+                                        {{ p.name || p.full_name || 'Unnamed' }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label>Outcome</label>
+                                <select v-model="newPenalty.outcome" required>
+                                    <option value="scored">Scored</option>
+                                    <option value="missed">Missed</option>
+                                </select>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-success" :disabled="isSubmittingPenalty">
+                                    <span v-if="isSubmittingPenalty" class="spinner-sm"></span>
+                                    {{ isSubmittingPenalty ? 'Adding...' : 'Add' }}
+                                </button>
+                            </div>
+                            <p v-if="penaltyError" class="error-message mt">{{ penaltyError }}</p>
+                            <p v-if="penaltySuccess" class="success-message mt">
+                                {{ penaltySuccess }}
                             </p>
                         </form>
                     </div>
@@ -232,6 +291,11 @@ const newEvent = ref({ type: 'goal', teamId: '', playerId: '', minute: '' })
 const isSubmittingEvent = ref(false)
 const editorError = ref('')
 const editorSuccess = ref('')
+
+const newPenalty = ref({ teamId: '', playerId: '', outcome: 'scored' })
+const isSubmittingPenalty = ref(false)
+const penaltyError = ref('')
+const penaltySuccess = ref('')
 
 const isFinishing = ref(false)
 const isFinished = computed(() => currentMatch.value?.status === 'finished')
@@ -316,6 +380,7 @@ const openEditor = async (m) => {
         const { data } = await apiClient.get(`/api/matches/${idOf(m)}`)
         currentMatch.value = data
         resetEventForm()
+        resetPenaltyForm()
         showEditor.value = true
     } catch (e) {
         console.error('Failed to load match details:', e)
@@ -326,11 +391,19 @@ const closeEditor = () => {
     currentMatch.value = null
     editorError.value = ''
     editorSuccess.value = ''
+    penaltyError.value = ''
+    penaltySuccess.value = ''
 }
 
 const eligiblePlayers = computed(() => {
     if (!currentMatch.value || !newEvent.value.teamId) return []
     const isA = idOf(currentMatch.value.teamA) === newEvent.value.teamId
+    const team = isA ? currentMatch.value.teamA : currentMatch.value.teamB
+    return team?.players || []
+})
+const penaltyPlayers = computed(() => {
+    if (!currentMatch.value || !newPenalty.value.teamId) return []
+    const isA = idOf(currentMatch.value.teamA) === newPenalty.value.teamId
     const team = isA ? currentMatch.value.teamA : currentMatch.value.teamB
     return team?.players || []
 })
@@ -348,8 +421,14 @@ const playerName = (ev) => {
 const onTeamChange = () => {
     newEvent.value.playerId = ''
 }
+const onPenaltyTeam = () => {
+    newPenalty.value.playerId = ''
+}
 const resetEventForm = () => {
     newEvent.value = { type: 'goal', teamId: '', playerId: '', minute: '' }
+}
+const resetPenaltyForm = () => {
+    newPenalty.value = { teamId: '', playerId: '', outcome: 'scored' }
 }
 
 const submitEvent = async () => {
@@ -393,6 +472,42 @@ const submitEvent = async () => {
         editorError.value = e.response?.data?.message || 'Failed to add event.'
     } finally {
         isSubmittingEvent.value = false
+    }
+}
+
+const submitPenalty = async () => {
+    penaltyError.value = ''
+    penaltySuccess.value = ''
+    if (!newPenalty.value.teamId || !newPenalty.value.playerId || !newPenalty.value.outcome) {
+        penaltyError.value = 'Team, player and outcome are required.'
+        return
+    }
+    isSubmittingPenalty.value = true
+    try {
+        const { data } = await apiClient.post(
+            `/api/matches/${idOf(currentMatch.value)}/penalties`,
+            {
+                teamId: newPenalty.value.teamId,
+                playerId: newPenalty.value.playerId,
+                outcome: newPenalty.value.outcome,
+            }
+        )
+        currentMatch.value = data.match
+        const idx = matches.value.findIndex((mm) => idOf(mm) === idOf(currentMatch.value))
+        if (idx !== -1) {
+            matches.value[idx] = {
+                ...matches.value[idx],
+                penalty_shootout: currentMatch.value.penalty_shootout,
+                result_type: currentMatch.value.result_type,
+            }
+        }
+        penaltySuccess.value = 'Penalty saved.'
+        resetPenaltyForm()
+    } catch (e) {
+        console.error('add penalty error:', e)
+        penaltyError.value = e.response?.data?.message || 'Failed to add penalty.'
+    } finally {
+        isSubmittingPenalty.value = false
     }
 }
 
@@ -610,26 +725,41 @@ const confirmDelete = async (m) => {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
-    display: grid;
-    place-items: center;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 24px;
+    overflow: auto;
     z-index: 1000;
     outline: none;
 }
+
 .modal-content {
     background: #fff;
     border-radius: 16px;
-    padding: 1rem 1rem 1.25rem;
+    padding: 0 1rem 1.25rem;
     width: 95%;
     max-width: 960px;
     box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 .modal-content.wide {
     max-width: 1000px;
 }
+
 .modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 2;
+    padding: 1rem 0 0.75rem 0;
+    border-bottom: 1px solid #eef1f3;
 }
 .modal-header h3 {
     margin: 0;
@@ -679,16 +809,20 @@ const confirmDelete = async (m) => {
 }
 
 .editor-layout {
+    flex: 1;
+    overflow: auto;
     display: grid;
     grid-template-columns: 320px 1fr;
     gap: 1.25rem;
     margin-top: 0.75rem;
+    padding-right: 0.25rem;
 }
 @media (max-width: 900px) {
     .editor-layout {
         grid-template-columns: 1fr;
     }
 }
+
 .event-form,
 .timeline {
     background: #fafbfc;
@@ -699,6 +833,11 @@ const confirmDelete = async (m) => {
 .event-form h4,
 .timeline h4 {
     margin: 0 0 0.75rem 0;
+}
+.sep {
+    margin: 1rem 0;
+    border: 0;
+    border-top: 1px solid #e6eaf0;
 }
 
 .form-row {

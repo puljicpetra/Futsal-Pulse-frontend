@@ -77,17 +77,16 @@
 
                                 <div class="match-card-body">
                                     <div class="team-info team-a">
-                                        <span class="team-name">{{
-                                            match.teamA?.name || 'TBD'
-                                        }}</span>
+                                        <span class="team-name">
+                                            {{ match.teamA?.name || 'TBD' }}
+                                        </span>
                                     </div>
 
                                     <div class="score-info">
                                         <span class="score">
                                             <template
                                                 v-if="
-                                                    match.status === 'finished' ||
-                                                    (match.events && match.events.length)
+                                                    match.status === 'finished' || hasScore(match)
                                                 "
                                             >
                                                 {{ totalScore(match).a }} :
@@ -108,9 +107,9 @@
                                     </div>
 
                                     <div class="team-info team-b">
-                                        <span class="team-name">{{
-                                            match.teamB?.name || 'TBD'
-                                        }}</span>
+                                        <span class="team-name">
+                                            {{ match.teamB?.name || 'TBD' }}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -215,6 +214,18 @@ const groupedMatches = computed(() => {
             matches: matches.slice().sort((a, b) => new Date(a.matchDate) - new Date(b.matchDate)),
         }))
 })
+
+const hasScore = (m) => {
+    const a = m?.score?.teamA ?? 0
+    const b = m?.score?.teamB ?? 0
+    const ota = m?.overtime_score?.teamA ?? 0
+    const otb = m?.overtime_score?.teamB ?? 0
+    const pa =
+        typeof m?.penalty_shootout?.teamA_goals === 'number' ? m.penalty_shootout.teamA_goals : 0
+    const pb =
+        typeof m?.penalty_shootout?.teamB_goals === 'number' ? m.penalty_shootout.teamB_goals : 0
+    return a + b + ota + otb + pa + pb > 0
+}
 
 const applyFilters = () => {
     fetchMatches()
