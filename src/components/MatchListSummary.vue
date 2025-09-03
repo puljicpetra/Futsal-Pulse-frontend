@@ -150,9 +150,9 @@
                                     required
                                     placeholder="e.g., 17"
                                 />
-                                <small class="text-muted"
-                                    >Regular 1–40, Overtime 41–50 (only if 1–40 ended draw)</small
-                                >
+                                <small class="text-muted">
+                                    Regular 1–40, Overtime 41–50 (only if 1–40 ended draw)
+                                </small>
                             </div>
                             <div class="form-actions">
                                 <button class="btn btn-success" :disabled="isSubmittingEvent">
@@ -203,6 +203,12 @@
                                         {{ p.name || p.full_name || 'Unnamed' }}
                                     </option>
                                 </select>
+                                <small
+                                    v-if="newPenalty.teamId && penaltyPlayers.length === 0"
+                                    class="text-muted"
+                                >
+                                    All players from this team have already taken a kick.
+                                </small>
                             </div>
                             <div class="form-row">
                                 <label>Outcome</label>
@@ -226,9 +232,11 @@
 
                     <div class="timeline">
                         <h4>Timeline</h4>
+
                         <div v-if="!currentMatch?.events?.length" class="text-muted">
                             No events yet.
                         </div>
+
                         <ul v-else class="timeline-list">
                             <li
                                 v-for="ev in sortedEvents"
@@ -260,6 +268,33 @@
                                 </button>
                             </li>
                         </ul>
+
+                        <template v-if="penaltyEvents.length > 0">
+                            <hr class="sep" />
+                            <h4>Penalties</h4>
+                            <div class="timeline-split">
+                                <div class="timeline-col">
+                                    <div
+                                        v-for="(p, i) in teamA_penalties"
+                                        :key="idOf(p._id) || `${idOf(p.playerId)}-A-${i}`"
+                                        class="event-row-split"
+                                    >
+                                        <span>{{ penaltyPlayerName(p) }}</span>
+                                        <i :class="getPenaltyIcon(p.outcome)"></i>
+                                    </div>
+                                </div>
+                                <div class="timeline-col right-aligned">
+                                    <div
+                                        v-for="(p, i) in teamB_penalties"
+                                        :key="idOf(p._id) || `${idOf(p.playerId)}-B-${i}`"
+                                        class="event-row-split"
+                                    >
+                                        <i :class="getPenaltyIcon(p.outcome)"></i>
+                                        <span>{{ penaltyPlayerName(p) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -401,23 +436,54 @@ const eligiblePlayers = computed(() => {
     const team = isA ? currentMatch.value.teamA : currentMatch.value.teamB
     return team?.players || []
 })
+
+const takenPenaltyPlayerIdsForTeam = (teamId) => {
+    const events = currentMatch.value?.penalty_shootout?.events || []
+    const tid = idOf(teamId)
+    const set = new Set()
+    for (const e of events) {
+        if (idOf(e.teamId) === tid) set.add(idOf(e.playerId))
+    }
+    return set
+}
+
 const penaltyPlayers = computed(() => {
     if (!currentMatch.value || !newPenalty.value.teamId) return []
     const isA = idOf(currentMatch.value.teamA) === newPenalty.value.teamId
     const team = isA ? currentMatch.value.teamA : currentMatch.value.teamB
-    return team?.players || []
+    const taken = takenPenaltyPlayerIdsForTeam(newPenalty.value.teamId)
+    return (team?.players || []).filter((p) => !taken.has(idOf(p)))
 })
+
 const sortedEvents = computed(() => {
     const evs = (currentMatch.value?.events || []).slice()
     evs.sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0))
     return evs
 })
+const penaltyEvents = computed(() => currentMatch.value?.penalty_shootout?.events || [])
+const teamA_penalties = computed(() =>
+    penaltyEvents.value.filter((e) => idOf(e.teamId) === idOf(currentMatch.value?.teamA))
+)
+const teamB_penalties = computed(() =>
+    penaltyEvents.value.filter((e) => idOf(e.teamId) === idOf(currentMatch.value?.teamB))
+)
+
+const getPenaltyIcon = (outcome) =>
+    outcome === 'scored' ? 'fas fa-check-circle' : 'fas fa-times-circle'
+
 const isTeamB = (ev) => idOf(ev.teamId) === idOf(currentMatch.value?.teamB)
 const playerName = (ev) => {
     const team = isTeamB(ev) ? currentMatch.value?.teamB : currentMatch.value?.teamA
     const p = (team?.players || []).find((p) => idOf(p) === idOf(ev.playerId))
     return p?.name || p?.full_name || 'Unknown player'
 }
+const penaltyPlayerName = (penEv) => {
+    const isB = idOf(penEv.teamId) === idOf(currentMatch.value?.teamB)
+    const team = isB ? currentMatch.value?.teamB : currentMatch.value?.teamA
+    const p = (team?.players || []).find((pp) => idOf(pp) === idOf(penEv.playerId))
+    return p?.name || p?.full_name || 'Unknown player'
+}
+
 const onTeamChange = () => {
     newEvent.value.playerId = ''
 }
@@ -1005,5 +1071,36 @@ const confirmDelete = async (m) => {
     color: #c82333;
     border-color: #f1d2d6;
     background: #fdebed;
+}
+
+.timeline-split {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+.timeline-col {
+    width: 48%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+.event-row-split {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.95rem;
+}
+.timeline-col.right-aligned {
+    text-align: right;
+}
+.timeline-col.right-aligned .event-row-split {
+    justify-content: flex-end;
+    flex-direction: row-reverse;
+}
+.fa-check-circle {
+    color: #198754;
+}
+.fa-times-circle {
+    color: #dc3545;
 }
 </style>
