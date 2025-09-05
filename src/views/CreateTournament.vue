@@ -18,6 +18,8 @@
                         type="text"
                         id="name"
                         v-model.trim="tournament.name"
+                        minlength="3"
+                        maxlength="100"
                         placeholder="e.g., Moja ulica, moja ekipa"
                         required
                     />
@@ -48,7 +50,13 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="startDate">Start Date</label>
-                        <input type="date" id="startDate" v-model="tournament.startDate" required />
+                        <input
+                            type="date"
+                            id="startDate"
+                            v-model="tournament.startDate"
+                            :max="tournament.endDate || null"
+                            required
+                        />
                     </div>
                     <div class="form-group">
                         <label for="endDate">End Date (optional)</label>
@@ -82,6 +90,7 @@
                         id="rules"
                         v-model.trim="tournament.rules"
                         rows="6"
+                        maxlength="5000"
                         placeholder="Describe the tournament format, rules, prizes..."
                     ></textarea>
                 </div>
@@ -143,6 +152,7 @@ const dateError = ref('')
 const fileError = ref('')
 
 const MAX_MB = 5
+const RULES_MAX = 5000
 const ALLOWED_TYPES = ['image/jpeg', 'image/png']
 
 const toDate = (yyyy_mm_dd) => {
@@ -158,9 +168,7 @@ watch(
         dateError.value = ''
         const s = toDate(tournament.value.startDate)
         const e = toDate(tournament.value.endDate)
-        if (s && e && e < s) {
-            dateError.value = 'End date cannot be before start date.'
-        }
+        if (s && e && e < s) dateError.value = 'End date cannot be before start date.'
     },
     { immediate: true }
 )
@@ -170,6 +178,7 @@ const isFormValid = computed(() => {
     if (!tournament.value.location.city.trim()) return false
     if (!tournament.value.startDate) return false
     if (!tournament.value.surface) return false
+    if (tournament.value.rules && tournament.value.rules.length > RULES_MAX) return false
     if (dateError.value) return false
     if (fileError.value) return false
     return true
@@ -199,7 +208,13 @@ const handleFileChange = (event) => {
 }
 
 const submitTournament = async () => {
+    if (isSubmitting.value) return
     if (!isFormValid.value) return
+
+    if (tournament.value.rules && tournament.value.rules.length > RULES_MAX) {
+        error.value = `Rules text is too long (max ${RULES_MAX} characters).`
+        return
+    }
 
     isSubmitting.value = true
     error.value = ''
@@ -211,7 +226,7 @@ const submitTournament = async () => {
     formData.append('name', t.name.trim())
     formData.append(
         'location',
-        JSON.stringify({ city: t.location.city.trim(), venue: t.location.venue.trim() })
+        JSON.stringify({ city: t.location.city.trim(), venue: (t.location.venue || '').trim() })
     )
     formData.append('startDate', t.startDate)
     formData.append('surface', t.surface)
@@ -224,7 +239,8 @@ const submitTournament = async () => {
         success.value = response.data.message || 'Tournament created!'
         setTimeout(() => {
             const id = response.data?.tournament?._id || response.data?._id
-            router.push(`/tournaments/${id}`)
+            if (id) router.push(`/tournaments/${id}`)
+            else router.push('/tournaments')
         }, 1200)
     } catch (err) {
         if (err.response?.data) {

@@ -4,29 +4,38 @@ import { useRouter } from 'vue-router'
 import apiClient from '@/services/api'
 import { jwtDecode } from 'jwt-decode'
 
-const safeJwtDecode = (token) => {
-    if (!token) return null
+const decodeJwt = (t) => {
+    if (!t) return null
     try {
-        return jwtDecode(token)
-    } catch (error) {
-        console.error('Failed to decode token:', error)
+        return jwtDecode(t)
+    } catch {
         return null
     }
+}
+const isExpired = (t) => {
+    const d = decodeJwt(t)
+    if (!d?.exp) return false
+    const nowSec = Math.floor(Date.now() / 1000)
+    return d.exp <= nowSec
 }
 
 export const useAuthStore = defineStore('auth', () => {
     const token = ref(localStorage.getItem('token'))
     const userRole = ref(localStorage.getItem('userRole'))
-    const decodedTokenData = computed(() => safeJwtDecode(token.value))
-    const userId = computed(() => decodedTokenData.value?.id || null)
+
+    const decoded = computed(() => decodeJwt(token.value))
+    const userId = computed(() => decoded.value?.id || null)
+    const roleFromToken = computed(() => decoded.value?.role || null)
+
+    const isLoggedIn = computed(() => !!token.value && !isExpired(token.value))
+    const isOrganizer = computed(() => (userRole.value || roleFromToken.value) === 'organizer')
+    const isPlayer = computed(() => (userRole.value || roleFromToken.value) === 'player')
 
     const unreadInvitationCount = ref(0)
     const allNotifications = ref([])
     const totalUnreadCount = ref(0)
 
     const router = useRouter()
-
-    const isLoggedIn = computed(() => !!token.value)
 
     async function fetchAllNotifications() {
         if (!isLoggedIn.value) return
@@ -45,54 +54,50 @@ export const useAuthStore = defineStore('auth', () => {
 
     function setAuthData(newToken, newRole) {
         token.value = newToken
-        userRole.value = newRole
+        userRole.value = newRole || roleFromToken.value || null
 
         localStorage.setItem('token', newToken)
-        localStorage.setItem('userRole', newRole)
+        if (userRole.value) localStorage.setItem('userRole', userRole.value)
 
         fetchAllNotifications()
     }
 
     async function login(username, password) {
-        try {
-            const res = await apiClient.post('/auth/login', { username, password })
-            setAuthData(res.data.jwt_token, res.data.role)
-            router.push('/')
-        } catch (error) {
-            console.error('Login failed in authStore:', error)
-            throw error
-        }
+        const res = await apiClient.post('/auth/login', { username, password })
+        setAuthData(res.data.jwt_token, res.data.role)
+
+        const redirect = router.currentRoute.value.query.redirect || '/'
+        router.push(String(redirect) || '/')
     }
 
     async function register(userData) {
-        try {
-            const response = await apiClient.post('/auth/register', userData)
-            return response
-        } catch (error) {
-            console.error('Registration failed in authStore:', error)
-            throw error
-        }
+        const response = await apiClient.post('/auth/register', userData)
+        return response
     }
 
-    function logout() {
+    function hardResetLocal() {
         token.value = null
         userRole.value = null
         unreadInvitationCount.value = 0
         allNotifications.value = []
         totalUnreadCount.value = 0
-
         localStorage.removeItem('token')
         localStorage.removeItem('userRole')
+    }
 
+    async function logout() {
+        hardResetLocal()
         try {
-            router.push('/login')
+            await router.push('/login')
         } catch (e) {
             console.error('Router error on logout:', e)
             window.location.pathname = '/login'
         }
     }
 
-    if (token.value) {
+    if (token.value && isExpired(token.value)) {
+        hardResetLocal()
+    } else if (token.value) {
         fetchAllNotifications()
     }
 
@@ -101,6 +106,8 @@ export const useAuthStore = defineStore('auth', () => {
         userRole,
         userId,
         isLoggedIn,
+        isOrganizer,
+        isPlayer,
         login,
         logout,
         register,

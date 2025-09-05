@@ -24,17 +24,17 @@
                 <div class="header-meta">
                     <span v-if="tournament.location?.city">
                         <i class="fas fa-map-marker-alt"></i>
-                        {{ tournament.location.city
-                        }}{{ tournament.location?.venue ? `, ${tournament.location.venue}` : '' }}
+                        {{ tournament.location.city }}
+                        {{ tournament.location?.venue ? `, ${tournament.location.venue}` : '' }}
                     </span>
-                    <span
-                        ><i class="fas fa-calendar-alt"></i> Starts:
-                        {{ formatDate(tournament.startDate) }}</span
-                    >
-                    <span v-if="tournament.endDate"
-                        ><i class="fas fa-flag-checkered"></i> Ends:
-                        {{ formatDate(tournament.endDate) }}</span
-                    >
+                    <span>
+                        <i class="fas fa-calendar-alt"></i> Starts:
+                        {{ formatDate(tournament.startDate) }}
+                    </span>
+                    <span v-if="tournament.endDate">
+                        <i class="fas fa-flag-checkered"></i> Ends:
+                        {{ formatDate(tournament.endDate) }}
+                    </span>
                 </div>
 
                 <div class="actions-container">
@@ -90,6 +90,13 @@
                         :isOwner="isOwner"
                         @feedback="showFeedback"
                         @registrations-loaded="handleRegistrationsLoaded"
+                    />
+
+                    <TournamentReviews
+                        v-if="tournament"
+                        :tournament-id="tournament._id"
+                        :is-owner="isOwner"
+                        class="card"
                     />
                 </div>
 
@@ -156,12 +163,7 @@
                 <form @submit.prevent="submitNewMatch">
                     <div class="form-group">
                         <label for="stage">Stage</label>
-                        <select
-                            id="stage"
-                            v-model="newMatch.stage"
-                            required
-                            @change="fetchEligibleTeams"
-                        >
+                        <select id="stage" v-model="newMatch.stage" required>
                             <option disabled value="">Select stage</option>
                             <option v-for="st in allowedStages" :key="st.stage" :value="st.stage">
                                 {{ stageLabel(st.stage) }}
@@ -205,10 +207,10 @@
                             :max="maxDateTime"
                             required
                         />
-                        <small class="text-muted"
-                            >Allowed range: {{ prettyDateTime(minDateTime) }} –
-                            {{ prettyDateTime(maxDateTime) }}</small
-                        >
+                        <small class="text-muted">
+                            Allowed range: {{ prettyDateTime(minDateTime) }} –
+                            {{ prettyDateTime(maxDateTime) }}
+                        </small>
                     </div>
 
                     <div class="modal-actions">
@@ -227,12 +229,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import apiClient from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import TeamList from '@/components/TeamList.vue'
 import MatchListSummary from '@/components/MatchListSummary.vue'
+import TournamentReviews from '@/components/TournamentReviews.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -291,7 +294,7 @@ const oidString = (v) =>
 const idEq = (a, b) => {
     const sa = oidString(a),
         sb = oidString(b)
-    return !!sa && !!sb && sa === sb
+    return !!sa && !!sb && String(sa) === String(sb)
 }
 
 const isOwner = computed(() => {
@@ -319,9 +322,7 @@ const fetchMyCaptainTeams = async () => {
     isLoadingMyTeams.value = true
     try {
         const { data } = await apiClient.get('/api/teams/me')
-
         const pool = Array.isArray(data) ? data : data?.captainTeams ?? data?.teams ?? []
-
         myCaptainTeams.value = (pool || []).filter((t) =>
             idEq(t?.captain?._id ?? t?.captain, authStore.userId)
         )
@@ -348,9 +349,7 @@ const checkUserRegistration = async () => {
 
 const showFeedback = (feedbackData) => {
     feedback.value = feedbackData
-    setTimeout(() => {
-        feedback.value = { type: '', text: '' }
-    }, 4000)
+    setTimeout(() => (feedback.value = { type: '', text: '' }), 4000)
 }
 
 const handleRegistrationsLoaded = (loadedRegistrations) => {
@@ -377,11 +376,12 @@ const openRegisterModal = () => {
     showRegisterModal.value = true
     modalError.value = ''
     selectedTeamId.value = ''
-    if (myCaptainTeams.value.length === 0) {
-        fetchMyCaptainTeams()
-    }
+    if (myCaptainTeams.value.length === 0) fetchMyCaptainTeams()
 }
-const closeRegisterModal = () => (showRegisterModal.value = false)
+const closeRegisterModal = () => {
+    showRegisterModal.value = false
+    modalError.value = ''
+}
 
 const pad2 = (n) => String(n).padStart(2, '0')
 const toLocalInputValue = (d) => {
@@ -399,10 +399,11 @@ const parseLocal = (s) => {
     const [, Y, M, D, h, mi] = m.map(Number)
     return new Date(Y, M - 1, D, h, mi, 0, 0)
 }
+
 const minDateTime = computed(() => {
     if (!tournament.value?.startDate) return ''
     const start = new Date(tournament.value.startDate)
-    start.setHours(0, 0, 0, 0)
+    start.setHours(0, 1, 0, 0)
     return toLocalInputValue(start)
 })
 const maxDateTime = computed(() => {
@@ -446,6 +447,7 @@ const fetchAllowedStages = async () => {
 
 const fetchEligibleTeams = async () => {
     eligibleTeams.value = []
+    matchModalError.value = ''
     if (!newMatch.value.stage) return
     try {
         const { data } = await apiClient.get(`/api/matches/${route.params.id}/eligible-teams`, {
@@ -461,6 +463,13 @@ const fetchEligibleTeams = async () => {
         matchModalError.value = e.response?.data?.message || 'Failed to load eligible teams.'
     }
 }
+
+watch(
+    () => newMatch.value.stage,
+    () => {
+        fetchEligibleTeams()
+    }
+)
 
 const submitRegistration = async () => {
     isRegisteringTeam.value = true
@@ -494,9 +503,14 @@ const openAddMatchModal = async () => {
     await fetchAllowedStages()
     await fetchEligibleTeams()
 }
-const closeAddMatchModal = () => (showAddMatchModal.value = false)
+const closeAddMatchModal = () => {
+    showAddMatchModal.value = false
+    matchModalError.value = ''
+}
 
 const submitNewMatch = async () => {
+    if (isSubmittingMatch.value) return
+
     if (newMatch.value.teamA_id && newMatch.value.teamA_id === newMatch.value.teamB_id) {
         matchModalError.value = 'A team cannot play against itself.'
         return
@@ -542,9 +556,7 @@ const submitNewMatch = async () => {
         await apiClient.post('/api/matches', payload)
         closeAddMatchModal()
         showFeedback({ type: 'success', text: 'Match added successfully!' })
-        if (matchListSummaryComp.value) {
-            matchListSummaryComp.value.fetchMatchesSummary?.()
-        }
+        matchListSummaryComp.value?.fetchMatchesSummary?.()
     } catch (err) {
         matchModalError.value = err.response?.data?.message || 'Failed to create match.'
     } finally {

@@ -1,8 +1,13 @@
 import axios from 'axios'
 
+const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+
+let isHandlingAuthError = false
+
 const apiClient = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001',
-    headers: { 'Content-Type': 'application/json' },
+    baseURL: apiBase,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    timeout: 10000,
 })
 
 apiClient.interceptors.request.use(
@@ -34,24 +39,52 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
-        if (error?.response?.status === 401) {
+        const status = error?.response?.status
+        if ((status === 401 || status === 403) && !isHandlingAuthError) {
+            isHandlingAuthError = true
             try {
                 const { useAuthStore } = await import('@/stores/auth')
-                const authStore = useAuthStore()
-                authStore.logout?.()
-            } catch {
-                localStorage.removeItem('token')
-                localStorage.removeItem('userRole')
-                try {
-                    const { default: router } = await import('@/router')
-                    router.push('/login')
-                } catch {
-                    window.location.pathname = '/login'
+                const auth = useAuthStore?.()
+                if (auth?.logout) {
+                    await auth.logout()
+                } else {
+                    localStorage.removeItem('token')
+                    localStorage.removeItem('userRole')
+                    try {
+                        const { default: router } = await import('@/router')
+                        router.push('/login')
+                    } catch {
+                        window.location.pathname = '/login'
+                    }
                 }
+            } finally {
+                setTimeout(() => (isHandlingAuthError = false), 300)
             }
         }
         return Promise.reject(error)
     }
 )
+
+export async function listTournamentReviews(tournamentId, { page = 1, limit = 20 } = {}) {
+    const params = new URLSearchParams()
+    if (page) params.set('page', String(page))
+    if (limit) params.set('limit', String(limit))
+    const qs = params.toString()
+    const { data } = await apiClient.get(
+        `/api/tournaments/${tournamentId}/reviews${qs ? `?${qs}` : ''}`
+    )
+    return data
+}
+
+export async function upsertTournamentReview(tournamentId, { rating, comment }) {
+    const payload = { rating, comment }
+    const { data } = await apiClient.post(`/api/tournaments/${tournamentId}/reviews`, payload)
+    return data
+}
+
+export async function deleteTournamentReview(reviewId) {
+    const { data } = await apiClient.delete(`/api/reviews/${reviewId}`)
+    return data
+}
 
 export default apiClient

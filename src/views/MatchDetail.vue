@@ -149,8 +149,9 @@ const error = ref('')
 const idOf = (obj) => {
     if (!obj) return ''
     if (typeof obj === 'string') return obj
-    const raw = obj._id ?? obj.id ?? obj.$oid
-    return typeof raw === 'string' ? raw : raw?.$oid ?? String(raw ?? '')
+    const raw = obj.$oid ?? obj._id ?? obj.id ?? obj
+    if (typeof raw === 'string') return raw
+    return raw?.$oid ?? String(raw ?? '')
 }
 
 const playerMap = ref(new Map())
@@ -187,12 +188,12 @@ const allEventsSorted = computed(() => {
     const ev = match.value?.events ?? []
     return [...ev].sort((a, b) => (a.minute ?? 0) - (b.minute ?? 0))
 })
+
 const firstHalfEvents = computed(() => allEventsSorted.value.filter((e) => (e.minute ?? 0) <= 20))
 const secondHalfEvents = computed(() =>
     allEventsSorted.value.filter((e) => (e.minute ?? 0) > 20 && (e.minute ?? 0) <= 40)
 )
 const overtimeEvents = computed(() => allEventsSorted.value.filter((e) => (e.minute ?? 0) > 40))
-
 const showSecondHalfHeader = computed(
     () => secondHalfEvents.value.length > 0 || overtimeEvents.value.length > 0
 )
@@ -200,24 +201,27 @@ const showSecondHalfHeader = computed(
 const penaltyEvents = computed(() => match.value?.penalty_shootout?.events || [])
 const teamA_penalties = computed(() =>
     (match.value?.penalty_shootout?.events || []).filter(
-        (e) => idOf(e.teamId) === idOf(match.value?.teamA)
+        (e) => idOf(e.teamId) === idOf(match.value?.teamA?._id)
     )
 )
 const teamB_penalties = computed(() =>
     (match.value?.penalty_shootout?.events || []).filter(
-        (e) => idOf(e.teamId) === idOf(match.value?.teamB)
+        (e) => idOf(e.teamId) === idOf(match.value?.teamB?._id)
     )
 )
 
-const isTeamBEvent = (event) => idOf(event.teamId) === idOf(match.value?.teamB)
+const isTeamBEvent = (event) => idOf(event.teamId) === idOf(match.value?.teamB?._id)
+
 const getEventIcon = (type) =>
     ({
         goal: 'fas fa-futbol',
         'yellow-card': 'fas fa-square yellow-card',
         'red-card': 'fas fa-square red-card',
     }[type] || 'fas fa-question')
+
 const getPenaltyIcon = (outcome) =>
     outcome === 'scored' ? 'fas fa-check-circle' : 'fas fa-times-circle'
+
 const getPlayerName = (playerId) =>
     playerMap.value.get(idOf(playerId))?.name ||
     playerMap.value.get(idOf(playerId))?.full_name ||
@@ -231,6 +235,7 @@ const LABELS = {
     final: 'Final',
 }
 const labelForStage = (s) => LABELS[s] || '—'
+
 const prettyDateTime = (iso) => {
     if (!iso) return ''
     const d = new Date(iso)
@@ -288,7 +293,7 @@ onMounted(fetchMatchDetails)
 }
 .team-name {
     font-size: 1.5rem;
-    font-weight: bold;
+    font-weight: 700;
     color: #111827;
 }
 .score-display {
@@ -336,7 +341,7 @@ onMounted(fetchMatchDetails)
 .match-body h3 {
     text-align: center;
     font-size: 1.5rem;
-    margin: 0 0 2rem 0;
+    margin: 0 0 2rem;
 }
 .timeline-container {
     display: flex;
@@ -372,7 +377,7 @@ onMounted(fetchMatchDetails)
     border-radius: 15px;
     padding: 0.2rem 0.6rem;
     font-size: 0.8rem;
-    font-weight: bold;
+    font-weight: 700;
     color: #4b5563;
 }
 .event-details i {
@@ -383,7 +388,7 @@ onMounted(fetchMatchDetails)
 }
 .period-header {
     text-align: center;
-    font-weight: bold;
+    font-weight: 700;
     color: #6b7280;
     margin: 1.5rem 0 1rem;
     border-bottom: 1px solid #e5e7eb;

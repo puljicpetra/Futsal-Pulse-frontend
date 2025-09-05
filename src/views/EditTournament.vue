@@ -25,7 +25,14 @@
             <form @submit.prevent="submitUpdate">
                 <div class="form-group">
                     <label for="name">Tournament Name</label>
-                    <input type="text" id="name" v-model.trim="tournament.name" required />
+                    <input
+                        type="text"
+                        id="name"
+                        v-model.trim="tournament.name"
+                        minlength="3"
+                        maxlength="100"
+                        required
+                    />
                 </div>
 
                 <div class="form-row">
@@ -47,7 +54,13 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="startDate">Start Date</label>
-                        <input type="date" id="startDate" v-model="formattedStartDate" required />
+                        <input
+                            type="date"
+                            id="startDate"
+                            v-model="formattedStartDate"
+                            :max="formattedEndDate || null"
+                            required
+                        />
                     </div>
                     <div class="form-group">
                         <label for="endDate">End Date (optional)</label>
@@ -77,7 +90,12 @@
 
                 <div class="form-group">
                     <label for="rules">Rules & Description</label>
-                    <textarea id="rules" v-model.trim="tournament.rules" rows="6"></textarea>
+                    <textarea
+                        id="rules"
+                        v-model.trim="tournament.rules"
+                        rows="6"
+                        maxlength="5000"
+                    ></textarea>
                 </div>
 
                 <div class="form-group">
@@ -149,6 +167,7 @@ const dateError = ref('')
 const fileError = ref('')
 
 const MAX_MB = 5
+const RULES_MAX = 5000
 const ALLOWED_TYPES = ['image/jpeg', 'image/png']
 
 const formatDateForInput = (dateString) => {
@@ -184,9 +203,7 @@ watch(
         dateError.value = ''
         const s = toDate(formattedStartDate.value)
         const e = toDate(formattedEndDate.value)
-        if (s && e && e < s) {
-            dateError.value = 'End date cannot be before start date.'
-        }
+        if (s && e && e < s) dateError.value = 'End date cannot be before start date.'
     },
     { immediate: true }
 )
@@ -196,20 +213,23 @@ const isFormValid = computed(() => {
     if (!tournament.value?.location?.city?.trim()) return false
     if (!formattedStartDate.value) return false
     if (!tournament.value?.surface) return false
+    if (tournament.value?.rules && tournament.value.rules.length > RULES_MAX) return false
     if (dateError.value) return false
     if (fileError.value) return false
     return true
 })
 
-const normalizeOrganizerId = (data) =>
-    data?.organizer?._id || data?.organizer || data?.organizerInfo?._id || null
+const normalizeOrganizerId = (data) => {
+    const raw = data?.organizer?._id || data?.organizer || data?.organizerInfo?._id || null
+    return raw ? String(raw) : null
+}
 
 const fetchTournamentData = async () => {
     try {
         const response = await apiClient.get(`/api/tournaments/${tournamentId}`)
 
         const orgId = normalizeOrganizerId(response.data)
-        if (orgId && orgId !== authStore.userId) {
+        if (orgId && orgId !== String(authStore.userId)) {
             error.value = 'You do not have permission to edit this tournament.'
             setTimeout(() => router.push(`/tournaments/${tournamentId}`), 2500)
             return
@@ -261,7 +281,13 @@ const handleFileChange = (event) => {
 onBeforeUnmount(() => revokePreview())
 
 const submitUpdate = async () => {
+    if (isSubmitting.value) return
     if (!isFormValid.value) return
+
+    if (tournament.value.rules && tournament.value.rules.length > RULES_MAX) {
+        updateError.value = `Rules text is too long (max ${RULES_MAX} characters).`
+        return
+    }
 
     isSubmitting.value = true
     updateError.value = ''
@@ -279,7 +305,9 @@ const submitUpdate = async () => {
     formData.append('startDate', formattedStartDate.value)
     if (formattedEndDate.value) formData.append('endDate', formattedEndDate.value)
     formData.append('surface', tournament.value.surface)
-    formData.append('rules', tournament.value.rules?.trim() || '')
+    if (typeof tournament.value.rules === 'string') {
+        formData.append('rules', tournament.value.rules.trim())
+    }
 
     if (newImageFile.value) {
         formData.append('tournamentImage', newImageFile.value)
@@ -287,12 +315,10 @@ const submitUpdate = async () => {
 
     try {
         const response = await apiClient.put(`/api/tournaments/${tournamentId}`, formData)
-
         updateSuccess.value = 'Tournament updated successfully!'
         tournament.value = response.data
         newImageFile.value = null
         revokePreview()
-
         setTimeout(() => {
             updateSuccess.value = ''
         }, 3000)
@@ -313,9 +339,7 @@ const submitUpdate = async () => {
     }
 }
 
-onMounted(() => {
-    fetchTournamentData()
-})
+onMounted(fetchTournamentData)
 </script>
 
 <style scoped>

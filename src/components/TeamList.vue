@@ -1,17 +1,20 @@
 <template>
     <section class="teams-section card">
-        <h2><i class="fas fa-users"></i> Registered Teams ({{ registrations.length }})</h2>
+        <h2>
+            <i class="fas fa-users"></i>
+            {{ listTitle }} ({{ registrationsSorted.length }})
+        </h2>
 
         <div v-if="isLoading" class="loading-state-small">Loading teams...</div>
 
-        <ul v-else-if="registrations.length > 0" class="teams-list">
-            <li v-for="reg in registrations" :key="normalizeId(reg._id)" class="team-item">
+        <ul v-else-if="registrationsSorted.length > 0" class="teams-list">
+            <li v-for="reg in registrationsSorted" :key="normalizeId(reg._id)" class="team-item">
                 <div class="team-item-main">
                     <i class="fas fa-shield-alt"></i>
                     <div class="team-info">
                         <span class="team-name">{{ reg.team?.name }}</span>
                         <span class="captain-info">
-                            Captain: {{ reg.captain?.fullName || reg.captain?.username }}
+                            Captain: {{ reg.captain?.fullName || reg.captain?.username || '—' }}
                         </span>
                     </div>
                 </div>
@@ -69,7 +72,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import apiClient from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 
@@ -77,7 +80,6 @@ const props = defineProps({
     tournamentId: { type: String, required: true },
     isOwner: { type: Boolean, default: false },
 })
-
 const emit = defineEmits(['feedback', 'registrations-loaded'])
 
 const authStore = useAuthStore()
@@ -87,20 +89,30 @@ const isLoading = ref(true)
 const oidString = (v) =>
     typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null)
 
-const normalizeId = (id) => {
-    const s = oidString(id)
-    return s ?? ''
-}
-
+const normalizeId = (id) => oidString(id) ?? ''
 const idEq = (a, b) => {
-    const sa = oidString(a)
-    const sb = oidString(b)
+    const sa = oidString(a),
+        sb = oidString(b)
     return !!sa && !!sb && sa === sb
 }
 
-const isCaptainOfReg = (reg) => {
-    return idEq(reg?.captain?._id, authStore.userId)
-}
+const isCaptainOfReg = (reg) => idEq(reg?.captain?._id, authStore.userId)
+
+const listTitle = computed(() => (props.isOwner ? 'Registered Teams' : 'Approved Teams'))
+
+const statusRank = { pending: 0, pending_withdrawal: 1, approved: 2, rejected: 3 }
+const registrationsSorted = computed(() => {
+    const arr = [...registrations.value]
+    if (props.isOwner) {
+        return arr.sort((a, b) => {
+            const ra = statusRank[a.status] ?? 99
+            const rb = statusRank[b.status] ?? 99
+            if (ra !== rb) return ra - rb
+            return (a.team?.name || '').localeCompare(b.team?.name || '')
+        })
+    }
+    return arr.sort((a, b) => (a.team?.name || '').localeCompare(b.team?.name || ''))
+})
 
 const fetchRegistrations = async () => {
     isLoading.value = true
@@ -139,27 +151,24 @@ const updateRegistrationStatus = async (registrationId, newStatus) => {
 
 const requestTeamWithdrawal = async (registrationId) => {
     if (
-        window.confirm(
+        !window.confirm(
             'Are you sure you want to request withdrawal? The organizer will have to approve it.'
         )
-    ) {
-        emit('feedback', { type: '', text: '' })
-        try {
-            const res = await apiClient.post(
-                `/api/registrations/${normalizeId(registrationId)}/request-withdrawal`
-            )
-            emit('feedback', {
-                type: 'success',
-                text: res.data?.message || 'Withdrawal requested.',
-            })
-            await fetchRegistrations()
-        } catch (err) {
-            console.error('Failed to request withdrawal:', err)
-            emit('feedback', {
-                type: 'error',
-                text: err.response?.data?.message || 'Could not request withdrawal.',
-            })
-        }
+    )
+        return
+    emit('feedback', { type: '', text: '' })
+    try {
+        const res = await apiClient.post(
+            `/api/registrations/${normalizeId(registrationId)}/request-withdrawal`
+        )
+        emit('feedback', { type: 'success', text: res.data?.message || 'Withdrawal requested.' })
+        await fetchRegistrations()
+    } catch (err) {
+        console.error('Failed to request withdrawal:', err)
+        emit('feedback', {
+            type: 'error',
+            text: err.response?.data?.message || 'Could not request withdrawal.',
+        })
     }
 }
 
@@ -175,9 +184,7 @@ const formatStatus = (status) => {
         .join(' ')
 }
 
-onMounted(() => {
-    fetchRegistrations()
-})
+onMounted(fetchRegistrations)
 
 defineExpose({ fetchRegistrations })
 </script>

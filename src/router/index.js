@@ -17,6 +17,30 @@ const UserProfile = () => import('@/views/UserProfile.vue')
 const MyInvitations = () => import('@/views/MyInvitations.vue')
 const NotFound = () => import('@/views/NotFound.vue')
 
+function jwtExpired(token) {
+    if (!token) return true
+    try {
+        const base = token.split('.')[1]
+        if (!base) return true
+        const json = JSON.parse(
+            decodeURIComponent(
+                atob(base.replace(/-/g, '+').replace(/_/g, '/'))
+                    .split('')
+                    .map(function (c) {
+                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+                    })
+                    .join('')
+            )
+        )
+        const exp = json?.exp
+        if (!exp) return false
+        const now = Math.floor(Date.now() / 1000)
+        return exp <= now
+    } catch {
+        return true
+    }
+}
+
 const routes = [
     { path: '/', name: 'Home', component: Home, meta: { requiresAuth: true } },
     { path: '/login', name: 'Login', component: Login },
@@ -93,17 +117,29 @@ router.beforeEach((to) => {
     const token = localStorage.getItem('token')
     const role = localStorage.getItem('userRole')
 
+    if (token && jwtExpired(token)) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('userRole')
+        if (to.path !== '/login') {
+            return { path: '/login', query: { redirect: to.fullPath } }
+        }
+        return true
+    }
+
     if (to.meta.requiresAuth && !token) {
         return { path: '/login', query: { redirect: to.fullPath } }
     }
+
     if ((to.path === '/login' || to.path === '/register') && token) {
         return '/'
     }
+
     if (to.meta.roles && Array.isArray(to.meta.roles) && to.meta.roles.length) {
         if (!role || !to.meta.roles.includes(role)) {
             return '/'
         }
     }
+
     return true
 })
 

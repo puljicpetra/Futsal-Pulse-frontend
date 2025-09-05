@@ -23,7 +23,6 @@
                     />
                 </div>
 
-                <!-- ✅ checkbox i tekst su sada blizu -->
                 <label class="filter-group checkbox" title="Show only my team">
                     <input type="checkbox" v-model="onlyMine" />
                     <span>Only my team</span>
@@ -100,14 +99,13 @@ const authStore = useAuthStore()
 const isPlayer = computed(() => authStore.userRole === 'player')
 
 const allTeams = ref([])
-const myTeams = ref([]) // /api/teams/me (često ima detaljnije podatke)
+const myTeams = ref([])
 const isLoading = ref(true)
 const error = ref('')
 
 const search = ref('')
 const onlyMine = ref(false)
 
-/* ---------- helpers for ids ---------- */
 const oidString = (v) => {
     if (!v) return ''
     if (typeof v === 'string') return v
@@ -117,7 +115,6 @@ const oidString = (v) => {
 }
 const idOf = (obj) => oidString(obj?._id ?? obj?.id ?? obj)
 
-/* ---------- data fetch ---------- */
 const fetchAllTeams = async () => {
     const { data } = await apiClient.get('/api/teams')
     allTeams.value = Array.isArray(data) ? data : []
@@ -148,7 +145,6 @@ const reload = async () => {
     }
 }
 
-/* ---------- enrichment & UI helpers ---------- */
 const myTeamIds = computed(() => new Set(myTeams.value.map((t) => idOf(t))))
 const myTeamsMap = computed(() => {
     const m = new Map()
@@ -156,7 +152,6 @@ const myTeamsMap = computed(() => {
     return m
 })
 
-/* Spajamo (enrich) podatke: ako /api/teams nema detalje, pokušamo ih uzeti iz /api/teams/me */
 const enrichedTeams = computed(() => {
     return allTeams.value.map((t) => {
         const id = idOf(t)
@@ -166,7 +161,6 @@ const enrichedTeams = computed(() => {
 })
 
 const displayCaptain = (team) => {
-    // pokušaj raznih polja koja backend može poslati
     const cap =
         team.captainInfo ||
         team.captain_user ||
@@ -178,12 +172,10 @@ const displayCaptain = (team) => {
     if (typeof cap === 'object') {
         return cap.full_name || cap.fullName || cap.username || '—'
     }
-    // ako je samo ID, nemamo ime bez dodatnog API poziva
     return '—'
 }
 
 const playersCount = (team) => {
-    // probaj sve tipične varijante polja
     if (Array.isArray(team.players)) return team.players.length
     if (typeof team.playersCount === 'number') return team.playersCount
     if (typeof team.playerCount === 'number') return team.playerCount
@@ -192,10 +184,7 @@ const playersCount = (team) => {
     return null
 }
 
-/* ---------- filters & sorting ---------- */
-const applyFilters = () => {
-    /* samo trigga computed */
-}
+const applyFilters = () => {}
 const clearFilters = () => {
     search.value = ''
     onlyMine.value = false
@@ -213,7 +202,6 @@ const filteredAndSorted = computed(() => {
         list = list.filter((t) => (t.name || '').toLowerCase().includes(q))
     }
 
-    // Moji timovi na vrh, ostalo po imenu
     list.sort((a, b) => {
         const aMine = myTeamIds.value.has(idOf(a)) ? 0 : 1
         const bMine = myTeamIds.value.has(idOf(b)) ? 0 : 1
@@ -315,13 +303,12 @@ h1 {
     color: #1f2937;
 }
 
-/* ✅ checkbox i tekst bliže, vertikalno centrirani */
 .filter-group.checkbox {
     flex: 0;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    margin: 0 0 0.35rem 0; /* malo bliže drugim filtrima */
+    margin: 0 0 0.35rem 0;
     user-select: none;
 }
 .filter-group.checkbox input {

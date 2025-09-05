@@ -194,9 +194,7 @@ const saveProfile = async () => {
     }
 }
 
-const triggerFileDialog = () => {
-    fileInput.value?.click()
-}
+const triggerFileDialog = () => fileInput.value?.click()
 
 const onFileSelected = (event) => {
     const file = event.target.files?.[0]
@@ -204,6 +202,7 @@ const onFileSelected = (event) => {
 
     avatarError.value = ''
     avatarSuccess.value = ''
+
     if (!ALLOWED_TYPES.includes(file.type)) {
         avatarError.value = 'Please select a JPG or PNG image.'
         resetFileInput()
@@ -220,9 +219,7 @@ const onFileSelected = (event) => {
 }
 
 const resetFileInput = () => {
-    if (fileInput.value) {
-        fileInput.value.value = ''
-    }
+    if (fileInput.value) fileInput.value.value = ''
 }
 
 const uploadProfileImage = async (file) => {
@@ -234,12 +231,8 @@ const uploadProfileImage = async (file) => {
     formData.append('avatar', file)
 
     try {
-        const { data } = await apiClient.post('/api/users/me/avatar', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        if (user.value) {
-            user.value.profile_image_url = data.profile_image_url
-        }
+        const { data } = await apiClient.post('/api/users/me/avatar', formData)
+        if (user.value) user.value.profile_image_url = data.profile_image_url
         avatarSuccess.value = 'Profile picture updated!'
         setTimeout(() => (avatarSuccess.value = ''), 3000)
     } catch (error) {

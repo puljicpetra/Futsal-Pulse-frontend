@@ -130,7 +130,7 @@
                         >
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
-                        <div v-if="openMenuId === match._id" class="actions-dropdown">
+                        <div v-if="openMenuId === match._id" class="actions-dropdown" @click.stop>
                             <a v-if="match.status !== 'finished'" @click="openEventsModal(match)">
                                 <i class="fas fa-stopwatch"></i> Manage Events
                             </a>
@@ -215,13 +215,13 @@
                             class="btn-submit small"
                             :disabled="isSubmittingEvent"
                         >
-                            Add
+                            {{ isSubmittingEvent ? 'Adding…' : 'Add' }}
                         </button>
                     </form>
                 </div>
 
                 <div v-if="newEventPeriod === 'penalties'" class="event-section">
-                    <form @submit.prevent="handleAddPenaltyEvent" class="penalty-form">
+                    <form @submit.prevent class="penalty-form">
                         <select v-model="newPenalty.teamId" required>
                             <option :value="null" disabled>Select Team</option>
                             <option :value="selectedMatch.teamA._id">
@@ -252,6 +252,9 @@
                                 type="button"
                                 @click=";(newPenalty.outcome = 'scored'), handleAddPenaltyEvent()"
                                 class="btn-submit small"
+                                :disabled="
+                                    isSubmittingEvent || !newPenalty.teamId || !newPenalty.playerId
+                                "
                             >
                                 Scored
                             </button>
@@ -259,6 +262,9 @@
                                 type="button"
                                 @click=";(newPenalty.outcome = 'missed'), handleAddPenaltyEvent()"
                                 class="btn-cancel small"
+                                :disabled="
+                                    isSubmittingEvent || !newPenalty.teamId || !newPenalty.playerId
+                                "
                             >
                                 Missed
                             </button>
@@ -386,10 +392,10 @@ const newPenalty = ref({ teamId: null, playerId: null, outcome: null })
 
 const oidString = (v) =>
     typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null)
-
+const idKey = (v) => String(oidString(v) ?? v ?? '')
 const idEq = (a, b) => {
-    const sa = oidString(a)
-    const sb = oidString(b)
+    const sa = oidString(a),
+        sb = oidString(b)
     return !!sa && !!sb && sa === sb
 }
 
@@ -415,8 +421,8 @@ const fetchMatches = async () => {
     try {
         const { data } = await apiClient.get(`/api/matches/tournament/${tournamentId}`)
         for (const match of data) {
-            match.teamA?.players?.forEach((p) => allPlayers.value.set(p._id, p))
-            match.teamB?.players?.forEach((p) => allPlayers.value.set(p._id, p))
+            match.teamA?.players?.forEach((p) => allPlayers.value.set(idKey(p._id), p))
+            match.teamB?.players?.forEach((p) => allPlayers.value.set(idKey(p._id), p))
         }
         matches.value = data
     } catch (err) {
@@ -429,14 +435,14 @@ const fetchMatches = async () => {
 
 const availablePlayers = computed(() => {
     if (!newEvent.value.teamId || !selectedMatch.value) return []
-    return newEvent.value.teamId === selectedMatch.value.teamA._id
+    return idEq(newEvent.value.teamId, selectedMatch.value.teamA._id)
         ? selectedMatch.value.teamA.players
         : selectedMatch.value.teamB.players
 })
 
 const availablePenaltyTakers = computed(() => {
     if (!newPenalty.value.teamId || !selectedMatch.value) return []
-    return newPenalty.value.teamId === selectedMatch.value.teamA._id
+    return idEq(newPenalty.value.teamId, selectedMatch.value.teamA._id)
         ? selectedMatch.value.teamA.players
         : selectedMatch.value.teamB.players
 })
@@ -455,13 +461,12 @@ const overtimeEvents = computed(
 )
 const penaltyEvents = computed(() => selectedMatch.value?.penalty_shootout?.events || [])
 
-const isRegularTimeTie = (match) => match?.score.teamA === match?.score.teamB
+const isRegularTimeTie = (match) => (match?.score?.teamA ?? 0) === (match?.score?.teamB ?? 0)
 const isOvertimeTie = (match) => {
     if (!match || !match.overtime_score) return false
-    return (
-        match.score.teamA + match.overtime_score.teamA ===
-        match.score.teamB + match.overtime_score.teamB
-    )
+    const a = (match.score?.teamA ?? 0) + (match.overtime_score?.teamA ?? 0)
+    const b = (match.score?.teamB ?? 0) + (match.overtime_score?.teamB ?? 0)
+    return a === b
 }
 
 const finalScore = (match) => {
@@ -475,7 +480,7 @@ const finalScore = (match) => {
 
 const teamHasOvertimeEvents = (events, teamId) => {
     if (!events) return false
-    return events.some((e) => e.teamId === teamId && e.minute > 40)
+    return events.some((e) => idEq(e.teamId, teamId) && e.minute > 40)
 }
 
 const formatMatchDate = (dateString) => {
@@ -495,8 +500,8 @@ const sortedTeamEvents = (events, teamId, isOvertime) => {
     if (!events) return []
     return events
         .filter((e) => {
-            const inOvertime = e.minute > 40
-            return e.teamId === teamId && (isOvertime ? inOvertime : !inOvertime)
+            const inOT = e.minute > 40
+            return idEq(e.teamId, teamId) && (isOvertime ? inOT : !inOT)
         })
         .sort((a, b) => a.minute - b.minute)
 }
@@ -511,12 +516,12 @@ const getEventIcon = (type) =>
 const getPenaltyIcon = (outcome) =>
     outcome === 'scored' ? 'fas fa-check-circle' : 'fas fa-times-circle'
 
-const getPlayerName = (playerId) => allPlayers.value.get(playerId)?.name || 'Unknown'
+const getPlayerName = (playerId) => allPlayers.value.get(idKey(playerId))?.name || 'Unknown'
 
 const getTeamName = (teamId) => {
     if (!selectedMatch.value) return ''
-    if (selectedMatch.value.teamA?._id === teamId) return selectedMatch.value.teamA.name
-    if (selectedMatch.value.teamB?._id === teamId) return selectedMatch.value.teamB.name
+    if (idEq(selectedMatch.value.teamA?._id, teamId)) return selectedMatch.value.teamA.name
+    if (idEq(selectedMatch.value.teamB?._id, teamId)) return selectedMatch.value.teamB.name
     return 'Unknown'
 }
 
@@ -530,6 +535,7 @@ const toggleMenu = (matchId) => {
 const closeEventsModal = () => {
     showEventsModal.value = false
     selectedMatch.value = null
+    eventsModalError.value = ''
     fetchMatches()
 }
 
@@ -544,9 +550,13 @@ const openEventsModal = (match) => {
 }
 
 const handleAddEvent = async () => {
-    const minute = newEvent.value.minute
+    const minute = Number(newEvent.value.minute)
     const period = newEventPeriod.value
 
+    if (!newEvent.value.teamId || !newEvent.value.playerId) {
+        eventsModalError.value = 'Please select team and player.'
+        return
+    }
     if (!minute || minute < 1) {
         eventsModalError.value = 'Minute must be a positive number.'
         return
@@ -568,7 +578,7 @@ const handleAddEvent = async () => {
             newEvent.value
         )
         const updatedMatch = data.match
-        const index = matches.value.findIndex((m) => m._id === updatedMatch._id)
+        const index = matches.value.findIndex((m) => idEq(m._id, updatedMatch._id))
         if (index !== -1) matches.value[index] = updatedMatch
         selectedMatch.value = updatedMatch
         newEvent.value = { type: 'goal', teamId: null, playerId: null, minute: null }
@@ -583,7 +593,7 @@ const handleDeleteEvent = async (matchId, eventId) => {
     try {
         const { data } = await apiClient.delete(`/api/matches/${matchId}/events/${eventId}`)
         const updatedMatch = data.match
-        const index = matches.value.findIndex((m) => m._id === matchId)
+        const index = matches.value.findIndex((m) => idEq(m._id, matchId))
         if (index !== -1) matches.value[index] = updatedMatch
         selectedMatch.value = updatedMatch
     } catch (err) {
@@ -602,7 +612,7 @@ const handleProceedToPenalties = () => {
 }
 
 const handleAddPenaltyEvent = async () => {
-    if (!newPenalty.value.outcome) return
+    if (!newPenalty.value.teamId || !newPenalty.value.playerId || !newPenalty.value.outcome) return
     isSubmittingEvent.value = true
     eventsModalError.value = ''
     try {
@@ -611,7 +621,7 @@ const handleAddPenaltyEvent = async () => {
             newPenalty.value
         )
         const updatedMatch = data.match
-        const index = matches.value.findIndex((m) => m._id === updatedMatch._id)
+        const index = matches.value.findIndex((m) => idEq(m._id, updatedMatch._id))
         if (index !== -1) matches.value[index] = updatedMatch
         selectedMatch.value = updatedMatch
         newPenalty.value = { teamId: newPenalty.value.teamId, playerId: null, outcome: null }
@@ -630,7 +640,7 @@ const deleteMatch = async (matchId) => {
         return
     try {
         await apiClient.delete(`/api/matches/${matchId}`)
-        matches.value = matches.value.filter((m) => m._id !== matchId)
+        matches.value = matches.value.filter((m) => !idEq(m._id, matchId))
     } catch (err) {
         console.error('Failed to delete match:', err)
         error.value = err.response?.data?.message || 'Failed to delete match.'
@@ -644,46 +654,13 @@ const finishMatch = async (matchId) => {
     try {
         const { data } = await apiClient.patch(`/api/matches/${matchId}/finish`)
         const updated = data.match
-        const idx = matches.value.findIndex((m) => m._id === matchId)
+        const idx = matches.value.findIndex((m) => idEq(m._id, matchId))
         if (idx !== -1) matches.value[idx] = updated
     } catch (err) {
         console.error('Failed to finish match:', err)
         error.value = err.response?.data?.message || 'Failed to finish match.'
         setTimeout(() => (error.value = ''), 3000)
     }
-}
-
-const toLocalInputValue = (date) => {
-    const d = new Date(date)
-    const pad = (n) => String(n).padStart(2, '0')
-    const yyyy = d.getFullYear()
-    const mm = pad(d.getMonth() + 1)
-    const dd = pad(d.getDate())
-    const hh = pad(d.getHours())
-    const mi = pad(d.getMinutes())
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`
-}
-
-const minDateTime = computed(() => {
-    if (!tournament.value?.startDate) return null
-    return toLocalInputValue(tournament.value.startDate)
-})
-const maxDateTime = computed(() => {
-    if (!tournament.value?.endDate) return null
-    return toLocalInputValue(tournament.value.endDate)
-})
-
-const formatDateTimeForInfo = (d) => {
-    const dt = new Date(d)
-    const locale = navigator.language || undefined
-    return dt.toLocaleString(locale, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    })
 }
 
 onMounted(() => {
@@ -702,18 +679,15 @@ onUnmounted(() => {
     margin: 2rem auto;
     padding: 2rem;
 }
-
 .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
 }
-
 .page-header h1 {
     margin: 0;
 }
-
 .back-link {
     display: inline-flex;
     align-items: center;
@@ -726,25 +700,21 @@ onUnmounted(() => {
     background-color: #f0f0f0;
     transition: all 0.2s ease-in-out;
 }
-
 .back-link:hover {
     background-color: #e0e0e0;
 }
-
 .card {
-    background: white;
+    background: #fff;
     padding: 2rem;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
-
 .card-header-flex {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.5rem;
 }
-
 .card-header-flex h2 {
     margin: 0;
     padding: 0;
@@ -754,15 +724,13 @@ onUnmounted(() => {
     align-items: center;
     border: none;
 }
-
 .card-header-flex h2 i {
     margin-right: 0.75rem;
     color: #00aeef;
 }
-
 .btn-add-match {
     background-color: #198754;
-    color: white;
+    color: #fff;
     padding: 0.4rem 0.8rem;
     font-size: 0.9rem;
     border-radius: 6px;
@@ -772,7 +740,6 @@ onUnmounted(() => {
     align-items: center;
     gap: 0.5rem;
 }
-
 .loading-state-small,
 .text-muted {
     text-align: center;
@@ -780,35 +747,29 @@ onUnmounted(() => {
     padding: 1rem;
     font-style: italic;
 }
-
 .matches-list {
     list-style: none;
     padding: 0;
     margin: 0;
 }
-
 .match-item {
     padding: 1rem;
     border-bottom: 1px solid #f0f0f0;
     position: relative;
 }
-
 .match-item:last-child {
     border-bottom: none;
 }
-
 .match-info {
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-weight: 600;
 }
-
 .match-info .team-name {
     flex: 1;
     text-align: center;
 }
-
 .match-score {
     font-size: 1.25rem;
     padding: 0 1rem;
@@ -816,20 +777,17 @@ onUnmounted(() => {
     align-items: center;
     gap: 0.5rem;
 }
-
 .penalty-score {
     font-size: 0.9rem;
     font-weight: normal;
     color: #666;
 }
-
 .match-meta {
     font-size: 0.85rem;
     color: #888;
     text-align: center;
     margin-top: 0.5rem;
 }
-
 .group-badge {
     display: inline-block;
     background-color: #e9ecef;
@@ -838,36 +796,30 @@ onUnmounted(() => {
     border-radius: 4px;
     margin-left: 0.5rem;
 }
-
 .status-badge {
     padding: 0.2rem 0.6rem;
     border-radius: 4px;
     margin-left: 0.5rem;
-    font-weight: bold;
+    font-weight: 700;
 }
-
 .status-badge.finished {
-    background-color: #e2e3e5;
+    background: #e2e3e5;
     color: #495057;
 }
-
 .status-badge.overtime {
-    background-color: #fff3cd;
+    background: #fff3cd;
     color: #664d03;
 }
-
 .status-badge.penalty {
-    background-color: #e2d9f3;
+    background: #e2d9f3;
     color: #4c2a92;
 }
-
 .owner-actions {
     position: absolute;
     top: 50%;
     right: 1rem;
     transform: translateY(-50%);
 }
-
 .btn-menu {
     background: none;
     border: none;
@@ -883,17 +835,15 @@ onUnmounted(() => {
     justify-content: center;
     transition: background-color 0.2s;
 }
-
 .btn-menu:hover {
-    background-color: #f0f0f0;
+    background: #f0f0f0;
     color: #333;
 }
-
 .actions-dropdown {
     position: absolute;
     top: calc(100% + 5px);
     right: 0;
-    background-color: white;
+    background: #fff;
     border-radius: 8px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
     border: 1px solid #eee;
@@ -902,7 +852,6 @@ onUnmounted(() => {
     width: 180px;
     overflow: hidden;
 }
-
 .actions-dropdown a {
     display: flex;
     align-items: center;
@@ -914,36 +863,29 @@ onUnmounted(() => {
     white-space: nowrap;
     text-decoration: none;
 }
-
 .actions-dropdown a:hover {
-    background-color: #f5f5f5;
+    background: #f5f5f5;
 }
-
 .actions-dropdown a i {
     width: 16px;
     text-align: center;
     color: #888;
 }
-
 .actions-dropdown a.text-danger {
     color: #dc3545;
 }
-
 .actions-dropdown a.text-danger:hover {
-    background-color: #fee2e2;
+    background: #fee2e2;
     color: #b91c1c;
 }
-
 .actions-dropdown a.text-danger i {
     color: #dc3545;
 }
-
 .error-message {
     color: #dc3545;
     text-align: center;
     margin-top: 1rem;
 }
-
 .event-timeline-container {
     display: flex;
     justify-content: space-between;
@@ -951,96 +893,80 @@ onUnmounted(() => {
     font-size: 0.8rem;
     color: #666;
 }
-
 .timeline-team {
     width: 45%;
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
 }
-
 .timeline-team.right {
     align-items: flex-end;
 }
-
 .timeline-team .event-item {
     display: flex;
     align-items: center;
     gap: 0.4rem;
 }
-
 .timeline-team.right .event-item {
     flex-direction: row-reverse;
 }
-
 .period-header-timeline {
-    font-weight: bold;
+    font-weight: 700;
     font-size: 0.75rem;
     color: #333;
     margin-top: 0.5rem;
     width: 100%;
     text-align: left;
 }
-
 .timeline-team.right .period-header-timeline {
     text-align: right;
 }
-
 .event-item .fa-futbol,
 .fa-check-circle {
     color: #198754;
 }
-
 .event-item .yellow-card {
     color: #ffc107;
 }
-
 .event-item .red-card,
 .fa-times-circle {
     color: #dc3545;
 }
-
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
 }
-
 .modal-content {
-    background: white;
+    background: #fff;
     padding: 2rem;
     border-radius: 12px;
     width: 90%;
 }
-
 .modal-content.large {
     max-width: 650px;
 }
-
 .modal-content h3 {
     margin-top: 0;
 }
-
 .modal-content p {
     color: #666;
     text-align: center;
     margin-bottom: 1rem;
 }
-
 .modal-actions {
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
     margin-top: 1.5rem;
 }
-
 .btn-cancel,
 .btn-submit {
     padding: 0.7rem 1.2rem;
@@ -1049,77 +975,66 @@ onUnmounted(() => {
     cursor: pointer;
     border: none;
 }
-
 .btn-cancel {
-    background-color: #e9ecef;
+    background: #e9ecef;
     color: #343a40;
     border: 1px solid #ced4da;
 }
-
 .btn-cancel.small {
     padding: 0.5rem 1rem;
-    font-weight: normal;
+    font-weight: 400;
 }
-
 .btn-cancel:hover {
-    background-color: #dee2e6;
+    background: #dee2e6;
 }
 .btn-submit {
-    background-color: #198754;
-    color: white;
+    background: #198754;
+    color: #fff;
 }
 .btn-submit.small {
     padding: 0.5rem 1rem;
-    font-weight: normal;
+    font-weight: 400;
 }
 .btn-submit:disabled {
-    background-color: #a0a0a0;
+    background: #a0a0a0;
 }
-
 .event-section {
     margin-top: 1.5rem;
 }
-
 .period-selector {
     display: flex;
     align-items: center;
     gap: 1rem;
     margin-bottom: 1rem;
-    background-color: #f8f9fa;
+    background: #f8f9fa;
     padding: 1rem;
     border-radius: 8px;
 }
-
 .period-selector label {
-    font-weight: bold;
+    font-weight: 700;
 }
-
 .period-selector select {
     flex-grow: 1;
     padding: 0.5rem;
     border: 1px solid #ccc;
     border-radius: 6px;
 }
-
 .event-form {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 80px auto;
     gap: 1rem;
     align-items: center;
 }
-
 .penalty-form {
     display: grid;
     grid-template-columns: 1fr 1fr auto;
     gap: 1rem;
     align-items: center;
 }
-
 .penalty-actions {
     display: flex;
     gap: 0.5rem;
 }
-
 .event-form select,
 .event-form input,
 .penalty-form select {
@@ -1128,19 +1043,16 @@ onUnmounted(() => {
     border: 1px solid #ccc;
     border-radius: 6px;
 }
-
 .minute-input {
     -moz-appearance: textfield;
     appearance: none;
     margin: 0;
 }
-
 .minute-input::-webkit-outer-spin-button,
 .minute-input::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
-
 .existing-events-list {
     margin-top: 1.5rem;
     max-height: 280px;
@@ -1148,15 +1060,13 @@ onUnmounted(() => {
     border: 1px solid #eee;
     border-radius: 8px;
 }
-
 .period-header {
     padding: 0.5rem 1rem;
-    background-color: #f8f9fa;
-    font-weight: bold;
+    background: #f8f9fa;
+    font-weight: 700;
     color: #333;
     border-bottom: 1px solid #eee;
 }
-
 .existing-event-item {
     display: flex;
     justify-content: space-between;
@@ -1164,16 +1074,13 @@ onUnmounted(() => {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
 }
-
 .existing-event-item:last-child {
     border-bottom: none;
 }
-
 .existing-event-item.overtime-event {
     color: #664d03;
-    background-color: #fff3cd;
+    background: #fff3cd;
 }
-
 .btn-delete-event {
     background: none;
     border: none;
@@ -1181,19 +1088,16 @@ onUnmounted(() => {
     cursor: pointer;
     padding: 0.25rem;
 }
-
 .btn-delete-event:hover {
     color: #dc3545;
 }
-
 .proceed-section {
     text-align: center;
     margin: 1.5rem 0;
 }
-
 .btn-proceed {
-    background-color: #0d6efd;
-    color: white;
+    background: #0d6efd;
+    color: #fff;
     padding: 0.6rem 1.5rem;
     font-size: 1rem;
     border-radius: 8px;
