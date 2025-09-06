@@ -134,7 +134,12 @@
                             <a v-if="match.status !== 'finished'" @click="openEventsModal(match)">
                                 <i class="fas fa-stopwatch"></i> Manage Events
                             </a>
-                            <a v-if="match.status !== 'finished'" @click="finishMatch(match._id)">
+                            <a
+                                v-if="match.status !== 'finished'"
+                                :class="{ disabled: !canFinish(match) }"
+                                @click="canFinish(match) && finishMatch(match._id)"
+                                title="Finish Match"
+                            >
                                 <i class="fas fa-flag-checkered"></i> Finish Match
                             </a>
                             <a @click="deleteMatch(match._id)" class="text-danger">
@@ -159,13 +164,17 @@
                         <option value="regular">Regular Time</option>
                         <option
                             value="overtime"
-                            :disabled="selectedMatch.result_type === 'regular'"
+                            :disabled="
+                                selectedMatch.result_type === 'regular' && !selectedMatchFinished
+                            "
                         >
                             Overtime
                         </option>
                         <option
                             value="penalties"
-                            :disabled="selectedMatch.result_type !== 'penalties'"
+                            :disabled="
+                                selectedMatch.result_type !== 'penalties' && !selectedMatchFinished
+                            "
                         >
                             Penalties
                         </option>
@@ -206,7 +215,7 @@
                             inputmode="numeric"
                             pattern="[0-9]*"
                             v-model.number="newEvent.minute"
-                            placeholder="Min"
+                            :placeholder="newEventPeriod === 'overtime' ? '41–50' : '1–40'"
                             required
                             class="minute-input"
                         />
@@ -274,7 +283,9 @@
 
                 <div
                     v-if="
-                        isRegularTimeTie(selectedMatch) && selectedMatch.result_type === 'regular'
+                        isRegularTimeTie(selectedMatch) &&
+                        selectedMatch.result_type === 'regular' &&
+                        !selectedMatchFinished
                     "
                     class="proceed-section"
                 >
@@ -283,7 +294,11 @@
                     </button>
                 </div>
                 <div
-                    v-if="isOvertimeTie(selectedMatch) && selectedMatch.result_type === 'overtime'"
+                    v-if="
+                        isOvertimeTie(selectedMatch) &&
+                        selectedMatch.result_type === 'overtime' &&
+                        !selectedMatchFinished
+                    "
                     class="proceed-section"
                 >
                     <button @click="handleProceedToPenalties" class="btn-proceed">
@@ -365,7 +380,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import apiClient from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
@@ -389,6 +404,9 @@ const eventsModalError = ref('')
 const newEventPeriod = ref('regular')
 const newEvent = ref({ type: 'goal', teamId: null, playerId: null, minute: null })
 const newPenalty = ref({ teamId: null, playerId: null, outcome: null })
+
+const MAX_PENALTY_SERIES = 5
+const MAX_REGULAR_MINUTE = 40
 
 const oidString = (v) =>
     typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null)
@@ -433,18 +451,84 @@ const fetchMatches = async () => {
     }
 }
 
+const selectedMatchFinished = computed(() => selectedMatch.value?.status === 'finished')
+
+const ejectionMap = (match) => {
+    const map = new Map()
+    const yellowCounts = new Map()
+    const evts = (match?.events || []).slice().sort((a, b) => (a.minute || 0) - (b.minute || 0))
+    for (const e of evts) {
+        const pid = idKey(e.playerId)
+        if (!pid) continue
+        if (map.has(pid)) continue
+        if (e.type === 'red-card') {
+            map.set(pid, e.minute || 0)
+        } else if (e.type === 'yellow-card') {
+            yellowCounts.set(pid, (yellowCounts.get(pid) || 0) + 1)
+            if (yellowCounts.get(pid) >= 2) {
+                map.set(pid, e.minute || 0)
+            }
+        }
+    }
+    return map
+}
+const isEjected = (playerId) => {
+    if (!selectedMatch.value) return false
+    return ejectionMap(selectedMatch.value).has(idKey(playerId))
+}
+const ejectedBeforeMinute = (playerId, minute) => {
+    if (!selectedMatch.value) return false
+    const m = ejectionMap(selectedMatch.value).get(idKey(playerId))
+    if (m == null) return false
+    return Number(minute) > Number(m)
+}
+
+const penaltyShotsForTeam = (match, teamId) =>
+    (match?.penalty_shootout?.events || []).filter((e) => idEq(e.teamId, teamId)).length
+
+const computePenaltyDecision = (match) => {
+    const ps = match?.penalty_shootout
+    if (!ps) return { decided: false }
+    const shotsA = penaltyShotsForTeam(match, match.teamA._id)
+    const shotsB = penaltyShotsForTeam(match, match.teamB._id)
+    const goalsA = ps.teamA_goals ?? 0
+    const goalsB = ps.teamB_goals ?? 0
+
+    if (shotsA <= MAX_PENALTY_SERIES && shotsB <= MAX_PENALTY_SERIES) {
+        const remA = MAX_PENALTY_SERIES - shotsA
+        const remB = MAX_PENALTY_SERIES - shotsB
+        if (goalsA - goalsB > remB) return { decided: true }
+        if (goalsB - goalsA > remA) return { decided: true }
+    }
+    if (shotsA >= MAX_PENALTY_SERIES && shotsB >= MAX_PENALTY_SERIES) {
+        if (shotsA === shotsB && goalsA !== goalsB) return { decided: true }
+    }
+    return { decided: false }
+}
+
 const availablePlayers = computed(() => {
     if (!newEvent.value.teamId || !selectedMatch.value) return []
-    return idEq(newEvent.value.teamId, selectedMatch.value.teamA._id)
+    const roster = idEq(newEvent.value.teamId, selectedMatch.value.teamA._id)
         ? selectedMatch.value.teamA.players
         : selectedMatch.value.teamB.players
+
+    if (selectedMatchFinished.value) return roster
+
+    const minute = Number(newEvent.value.minute)
+    if (!minute || minute < 1) return roster
+
+    return roster.filter((p) => !ejectedBeforeMinute(p._id, minute))
 })
 
 const availablePenaltyTakers = computed(() => {
     if (!newPenalty.value.teamId || !selectedMatch.value) return []
-    return idEq(newPenalty.value.teamId, selectedMatch.value.teamA._id)
+    const roster = idEq(newPenalty.value.teamId, selectedMatch.value.teamA._id)
         ? selectedMatch.value.teamA.players
         : selectedMatch.value.teamB.players
+
+    if (selectedMatchFinished.value) return roster
+    const em = ejectionMap(selectedMatch.value)
+    return roster.filter((p) => !em.has(idKey(p._id)))
 })
 
 const regularTimeEvents = computed(
@@ -476,6 +560,17 @@ const finalScore = (match) => {
         final.teamB += match.overtime_score.teamB
     }
     return final
+}
+
+const canFinish = (m) => {
+    if (!m) return false
+    if (m.result_type === 'penalties') {
+        return computePenaltyDecision(m).decided
+    }
+    if (m.result_type === 'overtime') {
+        return !isOvertimeTie(m)
+    }
+    return !isRegularTimeTie(m)
 }
 
 const teamHasOvertimeEvents = (events, teamId) => {
@@ -561,13 +656,29 @@ const handleAddEvent = async () => {
         eventsModalError.value = 'Minute must be a positive number.'
         return
     }
-    if (period === 'regular' && minute > 40) {
-        eventsModalError.value = 'Regular time minutes cannot exceed 40.'
-        return
-    }
-    if (period === 'overtime' && (minute <= 40 || minute > 50)) {
-        eventsModalError.value = 'Overtime minutes must be between 41 and 50.'
-        return
+
+    if (!selectedMatchFinished.value) {
+        if (period === 'regular' && minute > MAX_REGULAR_MINUTE) {
+            eventsModalError.value = 'Regular time minutes cannot exceed 40.'
+            return
+        }
+        if (period === 'overtime') {
+            if (minute <= MAX_REGULAR_MINUTE || minute > 50) {
+                eventsModalError.value = 'Overtime minutes must be between 41 and 50.'
+                return
+            }
+            if (!isRegularTimeTie(selectedMatch.value)) {
+                eventsModalError.value =
+                    'Cannot add overtime events unless regular time ended level.'
+                return
+            }
+        }
+        if (ejectedBeforeMinute(newEvent.value.playerId, minute)) {
+            eventsModalError.value =
+                'This player was sent off earlier and cannot have further events.'
+            return
+        }
+    } else {
     }
 
     isSubmittingEvent.value = true
@@ -613,6 +724,18 @@ const handleProceedToPenalties = () => {
 
 const handleAddPenaltyEvent = async () => {
     if (!newPenalty.value.teamId || !newPenalty.value.playerId || !newPenalty.value.outcome) return
+
+    if (!selectedMatchFinished.value) {
+        if (!isOvertimeTie(selectedMatch.value)) {
+            eventsModalError.value = 'Penalties are only allowed if it is tied after overtime.'
+            return
+        }
+        if (isEjected(newPenalty.value.playerId)) {
+            eventsModalError.value = 'Sent-off players cannot take penalties.'
+            return
+        }
+    }
+
     isSubmittingEvent.value = true
     eventsModalError.value = ''
     try {
@@ -662,6 +785,27 @@ const finishMatch = async (matchId) => {
         setTimeout(() => (error.value = ''), 3000)
     }
 }
+
+watch(
+    [() => newEvent.value.minute, () => newEvent.value.teamId, () => selectedMatch.value?.events],
+    () => {
+        if (!selectedMatch.value || selectedMatchFinished.value) return
+        const minute = Number(newEvent.value.minute)
+        if (!minute || minute < 1) return
+        const pid = newEvent.value.playerId
+        if (pid && ejectedBeforeMinute(pid, minute)) {
+            newEvent.value.playerId = null
+        }
+    }
+)
+
+watch([() => newPenalty.value.teamId, () => selectedMatch.value?.events], () => {
+    if (!selectedMatch.value || selectedMatchFinished.value) return
+    const pid = newPenalty.value.playerId
+    if (pid && isEjected(pid)) {
+        newPenalty.value.playerId = null
+    }
+})
 
 onMounted(() => {
     fetchMatches()
@@ -881,6 +1025,13 @@ onUnmounted(() => {
 .actions-dropdown a.text-danger i {
     color: #dc3545;
 }
+
+.actions-dropdown a.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
 .error-message {
     color: #dc3545;
     text-align: center;
@@ -934,7 +1085,7 @@ onUnmounted(() => {
 }
 .modal-overlay {
     position: fixed;
-    top: 0;
+    top: 0,
     left: 0;
     width: 100%;
     height: 100%;

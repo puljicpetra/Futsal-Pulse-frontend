@@ -15,7 +15,7 @@
             <div class="navigation-container">
                 <router-link to="/teams" class="back-link">
                     <i class="fas fa-arrow-left"></i>
-                    <span>Back to My Teams</span>
+                    <span>Back to Teams</span>
                 </router-link>
             </div>
 
