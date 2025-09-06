@@ -54,15 +54,6 @@
                         </div>
                     </div>
 
-                    <div class="chips">
-                        <StatsChip type="apps" :value="safeStat(p, 'apps')" size="sm" />
-                        <StatsChip type="goals" :value="safeStat(p, 'goals')" size="sm" />
-                        <StatsChip type="yellow" :value="safeStat(p, 'yellowCards')" size="sm" />
-                        <StatsChip type="red" :value="safeStat(p, 'redCards')" size="sm" />
-                        <StatsChip type="pensScored" :value="safeStat(p, 'pensScored')" size="sm" />
-                        <StatsChip type="pensMissed" :value="safeStat(p, 'pensMissed')" size="sm" />
-                    </div>
-
                     <button class="btn-open" @click.stop="goToPlayer(p._id)">
                         View profile <i class="fas fa-chevron-right"></i>
                     </button>
@@ -86,7 +77,6 @@
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { searchPlayers } from '@/services/stats'
-import StatsChip from '@/components/StatsChip.vue'
 
 const router = useRouter()
 
@@ -152,13 +142,7 @@ const clearQuery = () => {
 }
 
 const goToPlayer = (id) => {
-    router.push({ name: 'PlayerProfile', params: { id: String(id) } })
-}
-
-const safeStat = (p, key) => {
-    if (p?.stats && typeof p.stats[key] !== 'undefined') return p.stats[key]
-    if (typeof p[key] !== 'undefined') return p[key]
-    return 0
+    router.push({ name: 'PlayerProfileStats', params: { id: String(id) } })
 }
 </script>
 
@@ -284,13 +268,6 @@ const safeStat = (p, key) => {
     margin: 0;
     color: #6b7280;
     font-size: 0.85rem;
-}
-
-.chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0.7rem 0 0.3rem;
 }
 
 .btn-open {

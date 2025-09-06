@@ -25,6 +25,7 @@
                     />
                     <div class="who">
                         <h1>{{ player.full_name || player.name || 'Unknown Player' }}</h1>
+                        <p class="muted" v-if="teamName">Team: {{ teamName }}</p>
                         <p class="muted" v-if="player.username">@{{ player.username }}</p>
                     </div>
                 </div>
@@ -69,14 +70,21 @@
                         <li v-for="m in logItems" :key="m.matchId || m._id" class="match-row">
                             <div class="left">
                                 <div class="title-line">
-                                    <strong>{{ m.teamAName || m.teamA?.name || 'Team A' }}</strong>
+                                    <strong>{{
+                                        (m.teamAName || m.teamA)?.name || 'Team A'
+                                    }}</strong>
                                     <span class="score">
                                         {{ scoreline(m) }}
                                     </span>
-                                    <strong>{{ m.teamBName || m.teamB?.name || 'Team B' }}</strong>
+                                    <strong>{{
+                                        (m.teamBName || m.teamB)?.name || 'Team B'
+                                    }}</strong>
                                 </div>
                                 <div class="meta">
                                     <span>{{ formatDate(m.matchDate || m.date) }}</span>
+                                    <span v-if="m.tournamentName || m.tournament">
+                                        · {{ m.tournamentName || m.tournament?.name }}</span
+                                    >
                                     <span v-if="m.stage"> · {{ prettyStage(m.stage) }}</span>
                                     <span
                                         v-if="m.result_type === 'overtime'"
@@ -159,13 +167,20 @@ const logError = ref('')
 const logItems = ref([])
 const limit = ref(10)
 
+const teamName = computed(() => player.value?.teamName || player.value?.team?.name || '')
+
 const fetchPlayer = async () => {
     isLoading.value = true
     error.value = ''
     try {
         const data = await getPlayerStats(playerId.value)
-        player.value = data?.player || {}
-        totals.value = data?.stats || null
+        if (data?.player) {
+            player.value = data.player
+            totals.value = data.stats || data.player?.stats || null
+        } else {
+            player.value = data || {}
+            totals.value = data?.stats || null
+        }
     } catch (e) {
         console.error('getPlayerStats failed:', e)
         error.value = e?.response?.data?.message || 'Failed to load player.'
@@ -206,6 +221,9 @@ watch(
 const n = (v) => Number(v || 0)
 const stat = (key) => {
     if (totals?.value && typeof totals.value[key] !== 'undefined') return totals.value[key]
+    if (player.value?.stats && typeof player.value.stats[key] !== 'undefined')
+        return player.value.stats[key]
+    if (typeof player.value[key] !== 'undefined') return player.value[key]
     return 0
 }
 
@@ -222,17 +240,16 @@ const prettyStage = (s) => {
 }
 
 const scoreline = (m) => {
-    const a = n(m.score?.teamA)
-    const b = n(m.score?.teamB)
-    const otA = n(m.overtime_score?.teamA)
-    const otB = n(m.overtime_score?.teamB)
-    const pa = n(m.penalty_shootout?.teamA_goals)
-    const pb = n(m.penalty_shootout?.teamB_goals)
+    const a = n(m.score?.teamA ?? m.scoreA ?? m.teamA_score)
+    const b = n(m.score?.teamB ?? m.scoreB ?? m.teamB_score)
+    const otA = n(m.overtime_score?.teamA ?? m.otA)
+    const otB = n(m.overtime_score?.teamB ?? m.otB)
+    const pa = n(m.penalty_shootout?.teamA_goals ?? m.pensA)
+    const pb = n(m.penalty_shootout?.teamB_goals ?? m.pensB)
 
     const baseA = a + otA
     const baseB = b + otB
-
-    if (m.result_type === 'penalties' || pa + pb > 0) {
+    if ((m.result_type || m.resultType) === 'penalties' || pa + pb > 0) {
         return `${baseA} : ${baseB} (${pa}-${pb})`
     }
     return `${baseA} : ${baseB}`
