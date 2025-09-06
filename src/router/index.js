@@ -15,6 +15,9 @@ const CreateTeam = () => import('@/views/CreateTeam.vue')
 const TeamDetail = () => import('@/views/TeamDetail.vue')
 const UserProfile = () => import('@/views/UserProfile.vue')
 const MyInvitations = () => import('@/views/MyInvitations.vue')
+const PlayerSearch = () => import('@/views/PlayerSearch.vue')
+const PlayerProfileStats = () => import('@/views/PlayerProfileStats.vue')
+
 const NotFound = () => import('@/views/NotFound.vue')
 
 function jwtExpired(token) {
@@ -26,9 +29,7 @@ function jwtExpired(token) {
             decodeURIComponent(
                 atob(base.replace(/-/g, '+').replace(/_/g, '/'))
                     .split('')
-                    .map(function (c) {
-                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-                    })
+                    .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
                     .join('')
             )
         )
@@ -100,6 +101,14 @@ const routes = [
         name: 'MyInvitations',
         component: MyInvitations,
         meta: { requiresAuth: true, roles: ['player'] },
+    },
+
+    { path: '/players', name: 'Players', component: PlayerSearch, meta: { requiresAuth: true } },
+    {
+        path: '/players/:id',
+        name: 'PlayerProfileStats',
+        component: PlayerProfileStats,
+        meta: { requiresAuth: true },
     },
 
     { path: '/:pathMatch(.*)*', name: 'NotFound', component: NotFound },

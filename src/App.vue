@@ -60,6 +60,9 @@ const formattedUserRole = computed(() => {
                             <li class="nav-item">
                                 <router-link to="/teams" class="nav-link">Teams</router-link>
                             </li>
+                            <li class="nav-item">
+                                <router-link to="/players" class="nav-link">Players</router-link>
+                            </li>
                         </ul>
                         <div class="d-flex align-items-center ms-auto" v-if="authStore.isLoggedIn">
                             <NotificationBell />
