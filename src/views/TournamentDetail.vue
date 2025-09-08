@@ -84,6 +84,12 @@
                         </p>
                     </section>
 
+                    <TournamentAnnouncements
+                        :tournament-id="tId"
+                        :tournament="tournament"
+                        class="card"
+                    />
+
                     <TeamList
                         ref="teamListComp"
                         :tournamentId="tId"
@@ -122,8 +128,8 @@
                             <option disabled value="">Select a team...</option>
                             <option
                                 v-for="team in myCaptainTeams"
-                                :key="team._id"
-                                :value="team._id"
+                                :key="oidString(team._id)"
+                                :value="oidString(team._id)"
                             >
                                 {{ team.name }}
                             </option>
@@ -181,7 +187,11 @@
                         <label for="teamA">Team A</label>
                         <select id="teamA" v-model="newMatch.teamA_id" required>
                             <option disabled value="">Select Team A</option>
-                            <option v-for="t in eligibleTeams" :key="t._id" :value="t._id">
+                            <option
+                                v-for="t in eligibleTeams"
+                                :key="oidString(t._id)"
+                                :value="oidString(t._id)"
+                            >
                                 {{ t.name }}
                             </option>
                         </select>
@@ -191,7 +201,11 @@
                         <label for="teamB">Team B</label>
                         <select id="teamB" v-model="newMatch.teamB_id" required>
                             <option disabled value="">Select Team B</option>
-                            <option v-for="t in eligibleTeams" :key="t._id" :value="t._id">
+                            <option
+                                v-for="t in eligibleTeams"
+                                :key="oidString(t._id)"
+                                :value="oidString(t._id)"
+                            >
                                 {{ t.name }}
                             </option>
                         </select>
@@ -236,6 +250,7 @@ import { useAuthStore } from '@/stores/auth'
 import TeamList from '@/components/TeamList.vue'
 import MatchListSummary from '@/components/MatchListSummary.vue'
 import TournamentReviews from '@/components/TournamentReviews.vue'
+import TournamentAnnouncements from '@/components/TournamentAnnouncements.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -250,7 +265,6 @@ const feedback = ref({ type: '', text: '' })
 const myCaptainTeams = ref([])
 const isLoadingMyTeams = ref(false)
 const userRegistration = ref(null)
-
 const showRegisterModal = ref(false)
 const selectedTeamId = ref('')
 const isRegisteringTeam = ref(false)
@@ -327,8 +341,7 @@ const fetchMyCaptainTeams = async () => {
         myCaptainTeams.value = (pool || []).filter((t) =>
             idEq(t?.captain?._id ?? t?.captain, authStore.userId)
         )
-    } catch (err) {
-        console.error("Failed to fetch user's captain teams:", err)
+    } catch {
         myCaptainTeams.value = []
     } finally {
         isLoadingMyTeams.value = false
@@ -340,11 +353,13 @@ const checkUserRegistration = async () => {
         const { data } = await apiClient.get('/api/registrations', {
             params: { tournamentId: route.params.id },
         })
+        const all = Array.isArray(data) ? data : []
+        approvedRegistrations.value = all.filter((r) => r.status === 'approved')
         userRegistration.value =
-            (data || []).find((r) => idEq(r.captain?._id, authStore.userId)) || null
-    } catch (err) {
-        console.error('Failed to check user registration:', err)
+            all.find((r) => idEq(r.captain?._id ?? r.captain, authStore.userId)) || null
+    } catch {
         userRegistration.value = null
+        approvedRegistrations.value = []
     }
 }
 
@@ -441,7 +456,6 @@ const fetchAllowedStages = async () => {
             newMatch.value.stage = allowedStages.value[0].stage
         }
     } catch (e) {
-        console.error('fetchAllowedStages error', e)
         matchModalError.value = e.response?.data?.message || 'Failed to load stages.'
     }
 }
@@ -455,12 +469,11 @@ const fetchEligibleTeams = async () => {
             params: { stage: newMatch.value.stage },
         })
         eligibleTeams.value = data.teams || []
-        if (!eligibleTeams.value.find((t) => t._id === newMatch.value.teamA_id))
+        if (!eligibleTeams.value.find((t) => oidString(t._id) === newMatch.value.teamA_id))
             newMatch.value.teamA_id = ''
-        if (!eligibleTeams.value.find((t) => t._id === newMatch.value.teamB_id))
+        if (!eligibleTeams.value.find((t) => oidString(t._id) === newMatch.value.teamB_id))
             newMatch.value.teamB_id = ''
     } catch (e) {
-        console.error('fetchEligibleTeams error', e)
         matchModalError.value = e.response?.data?.message || 'Failed to load eligible teams.'
     }
 }
@@ -574,8 +587,8 @@ const formatDate = (dateString) => {
 
 onMounted(async () => {
     await fetchTournamentDetails()
-    if (tournament.value && authStore.userRole === 'player') {
-        checkUserRegistration()
+    if (tournament.value && authStore.isLoggedIn) {
+        if (authStore.userRole === 'player') await checkUserRegistration()
     }
 })
 </script>
@@ -608,9 +621,6 @@ onMounted(async () => {
 .back-link:hover {
     background-color: #e0e0e0;
     color: #111;
-}
-.back-link i {
-    transition: transform 0.2s;
 }
 .back-link:hover i {
     transform: translateX(-3px);
@@ -723,9 +733,12 @@ onMounted(async () => {
     line-height: 1.7;
     white-space: pre-wrap;
 }
-.text-muted {
+.text-muted,
+.muted {
     color: #888;
-    font-style: italic;
+}
+.small {
+    font-size: 0.9rem;
 }
 .loading-state,
 .error-state {
