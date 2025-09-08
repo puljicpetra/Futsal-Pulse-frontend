@@ -3,10 +3,10 @@
         class="stats-chip"
         :class="[variantClass, sizeClass, { bordered, pill }]"
         :title="computedTitle"
-        role="status"
-        aria-live="polite"
+        role="group"
+        :aria-label="computedAriaLabel"
     >
-        <i v-if="iconClass" :class="iconClass"></i>
+        <i v-if="iconClass" :class="iconClass" aria-hidden="true"></i>
         <span v-if="showLabel" class="label">{{ computedLabel }}</span>
         <span class="value">{{ value }}</span>
     </span>
@@ -43,6 +43,7 @@ const computedLabel = computed(() => props.label || meta.value.label)
 const variantClass = computed(() => `variant-${meta.value.variant}`)
 const sizeClass = computed(() => (props.size === 'sm' ? 'size-sm' : 'size-md'))
 const computedTitle = computed(() => props.title || `${computedLabel.value}: ${props.value}`)
+const computedAriaLabel = computed(() => computedTitle.value)
 </script>
 
 <style scoped>

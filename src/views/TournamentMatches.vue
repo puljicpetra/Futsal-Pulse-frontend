@@ -19,9 +19,9 @@
             </div>
 
             <ul class="matches-list">
-                <li v-for="match in matches" :key="match._id" class="match-item">
+                <li v-for="match in matches" :key="idKey(match._id)" class="match-item">
                     <div class="match-info">
-                        <span class="team-name">{{ match.teamA.name || 'TBD' }}</span>
+                        <span class="team-name">{{ match.teamA?.name || 'TBD' }}</span>
                         <span class="match-score">
                             {{ finalScore(match).teamA }} : {{ finalScore(match).teamB }}
                             <span
@@ -32,7 +32,7 @@
                                 {{ match.penalty_shootout.teamB_goals }})
                             </span>
                         </span>
-                        <span class="team-name">{{ match.teamB.name || 'TBD' }}</span>
+                        <span class="team-name">{{ match.teamB?.name || 'TBD' }}</span>
                     </div>
 
                     <div class="match-meta">
@@ -57,30 +57,36 @@
                     >
                         <div class="timeline-team">
                             <div
-                                v-for="event in sortedTeamEvents(
+                                v-for="(event, i) in sortedTeamEvents(
                                     match.events,
-                                    match.teamA._id,
+                                    idKey(match.teamA?._id),
                                     false
                                 )"
-                                :key="event._id"
+                                :key="
+                                    idKey(event._id) ||
+                                    `${idKey(event.playerId)}-${event.minute}-A-${i}`
+                                "
                                 class="event-item"
                             >
                                 <i :class="getEventIcon(event.type)"></i>
                                 <span>{{ getPlayerName(event.playerId) }} {{ event.minute }}'</span>
                             </div>
                             <div
-                                v-if="teamHasOvertimeEvents(match.events, match.teamA._id)"
+                                v-if="teamHasOvertimeEvents(match.events, idKey(match.teamA?._id))"
                                 class="period-header-timeline"
                             >
                                 Overtime
                             </div>
                             <div
-                                v-for="event in sortedTeamEvents(
+                                v-for="(event, i) in sortedTeamEvents(
                                     match.events,
-                                    match.teamA._id,
+                                    idKey(match.teamA?._id),
                                     true
                                 )"
-                                :key="event._id"
+                                :key="
+                                    idKey(event._id) ||
+                                    `${idKey(event.playerId)}-${event.minute}-AOT-${i}`
+                                "
                                 class="event-item"
                             >
                                 <i :class="getEventIcon(event.type)"></i>
@@ -90,30 +96,36 @@
 
                         <div class="timeline-team right">
                             <div
-                                v-for="event in sortedTeamEvents(
+                                v-for="(event, i) in sortedTeamEvents(
                                     match.events,
-                                    match.teamB._id,
+                                    idKey(match.teamB?._id),
                                     false
                                 )"
-                                :key="event._id"
+                                :key="
+                                    idKey(event._id) ||
+                                    `${idKey(event.playerId)}-${event.minute}-B-${i}`
+                                "
                                 class="event-item"
                             >
                                 <span>{{ event.minute }}' {{ getPlayerName(event.playerId) }}</span>
                                 <i :class="getEventIcon(event.type)"></i>
                             </div>
                             <div
-                                v-if="teamHasOvertimeEvents(match.events, match.teamB._id)"
+                                v-if="teamHasOvertimeEvents(match.events, idKey(match.teamB?._id))"
                                 class="period-header-timeline"
                             >
                                 Overtime
                             </div>
                             <div
-                                v-for="event in sortedTeamEvents(
+                                v-for="(event, i) in sortedTeamEvents(
                                     match.events,
-                                    match.teamB._id,
+                                    idKey(match.teamB?._id),
                                     true
                                 )"
-                                :key="event._id"
+                                :key="
+                                    idKey(event._id) ||
+                                    `${idKey(event.playerId)}-${event.minute}-BOT-${i}`
+                                "
                                 class="event-item"
                             >
                                 <span>{{ event.minute }}' {{ getPlayerName(event.playerId) }}</span>
@@ -124,25 +136,29 @@
 
                     <div v-if="isOwner" class="owner-actions">
                         <button
-                            @click.stop="toggleMenu(match._id)"
+                            @click.stop="toggleMenu(idKey(match._id))"
                             class="btn-menu"
                             title="Actions"
                         >
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
-                        <div v-if="openMenuId === match._id" class="actions-dropdown" @click.stop>
+                        <div
+                            v-if="openMenuId === idKey(match._id)"
+                            class="actions-dropdown"
+                            @click.stop
+                        >
                             <a v-if="match.status !== 'finished'" @click="openEventsModal(match)">
                                 <i class="fas fa-stopwatch"></i> Manage Events
                             </a>
                             <a
                                 v-if="match.status !== 'finished'"
                                 :class="{ disabled: !canFinish(match) }"
-                                @click="canFinish(match) && finishMatch(match._id)"
+                                @click="canFinish(match) && finishMatch(idKey(match._id))"
                                 title="Finish Match"
                             >
                                 <i class="fas fa-flag-checkered"></i> Finish Match
                             </a>
-                            <a @click="deleteMatch(match._id)" class="text-danger">
+                            <a @click="deleteMatch(idKey(match._id))" class="text-danger">
                                 <i class="fas fa-trash-alt"></i> Delete Match
                             </a>
                         </div>
@@ -155,7 +171,7 @@
             <div class="modal-content large">
                 <h3>Manage Match Events</h3>
                 <p v-if="selectedMatch">
-                    {{ selectedMatch.teamA.name }} vs {{ selectedMatch.teamB.name }}
+                    {{ selectedMatch.teamA?.name }} vs {{ selectedMatch.teamB?.name }}
                 </p>
 
                 <div class="period-selector">
@@ -185,11 +201,11 @@
                     <form @submit.prevent="handleAddEvent" class="event-form">
                         <select v-model="newEvent.teamId" required>
                             <option :value="null" disabled>Select Team</option>
-                            <option :value="selectedMatch.teamA._id">
-                                {{ selectedMatch.teamA.name }}
+                            <option :value="idKey(selectedMatch.teamA?._id)">
+                                {{ selectedMatch.teamA?.name }}
                             </option>
-                            <option :value="selectedMatch.teamB._id">
-                                {{ selectedMatch.teamB.name }}
+                            <option :value="idKey(selectedMatch.teamB?._id)">
+                                {{ selectedMatch.teamB?.name }}
                             </option>
                         </select>
 
@@ -197,8 +213,8 @@
                             <option :value="null" disabled>Select Player</option>
                             <option
                                 v-for="player in availablePlayers"
-                                :key="player._id"
-                                :value="player._id"
+                                :key="idKey(player._id)"
+                                :value="idKey(player._id)"
                             >
                                 {{ player.name }}
                             </option>
@@ -233,11 +249,11 @@
                     <form @submit.prevent class="penalty-form">
                         <select v-model="newPenalty.teamId" required>
                             <option :value="null" disabled>Select Team</option>
-                            <option :value="selectedMatch.teamA._id">
-                                {{ selectedMatch.teamA.name }}
+                            <option :value="idKey(selectedMatch.teamA?._id)">
+                                {{ selectedMatch.teamA?.name }}
                             </option>
-                            <option :value="selectedMatch.teamB._id">
-                                {{ selectedMatch.teamB.name }}
+                            <option :value="idKey(selectedMatch.teamB?._id)">
+                                {{ selectedMatch.teamB?.name }}
                             </option>
                         </select>
 
@@ -249,8 +265,8 @@
                             <option :value="null" disabled>Select Player</option>
                             <option
                                 v-for="player in availablePenaltyTakers"
-                                :key="player._id"
-                                :value="player._id"
+                                :key="idKey(player._id)"
+                                :value="idKey(player._id)"
                             >
                                 {{ player.name }}
                             </option>
@@ -310,8 +326,11 @@
                     <div v-if="regularTimeEvents.length > 0">
                         <div class="period-header">Regular Time</div>
                         <div
-                            v-for="event in regularTimeEvents"
-                            :key="event._id"
+                            v-for="(event, i) in regularTimeEvents"
+                            :key="
+                                idKey(event._id) ||
+                                `${idKey(event.playerId)}-${event.minute}-REG-${i}`
+                            "
                             class="existing-event-item"
                         >
                             <span>
@@ -321,7 +340,9 @@
                                 }})
                             </span>
                             <button
-                                @click="handleDeleteEvent(selectedMatch._id, event._id)"
+                                @click="
+                                    handleDeleteEvent(idKey(selectedMatch._id), idKey(event._id))
+                                "
                                 class="btn-delete-event"
                                 title="Delete Event"
                             >
@@ -333,8 +354,11 @@
                     <div v-if="overtimeEvents.length > 0">
                         <div class="period-header">Overtime</div>
                         <div
-                            v-for="event in overtimeEvents"
-                            :key="event._id"
+                            v-for="(event, i) in overtimeEvents"
+                            :key="
+                                idKey(event._id) ||
+                                `${idKey(event.playerId)}-${event.minute}-OT-${i}`
+                            "
                             class="existing-event-item overtime-event"
                         >
                             <span>
@@ -344,7 +368,9 @@
                                 }})
                             </span>
                             <button
-                                @click="handleDeleteEvent(selectedMatch._id, event._id)"
+                                @click="
+                                    handleDeleteEvent(idKey(selectedMatch._id), idKey(event._id))
+                                "
                                 class="btn-delete-event"
                                 title="Delete Event"
                             >
@@ -356,8 +382,8 @@
                     <div v-if="penaltyEvents.length > 0">
                         <div class="period-header">Penalty Shootout</div>
                         <div
-                            v-for="event in penaltyEvents"
-                            :key="event._id"
+                            v-for="(event, i) in penaltyEvents"
+                            :key="idKey(event._id) || `${idKey(event.playerId)}-PEN-${i}`"
                             class="existing-event-item"
                         >
                             <span>
@@ -685,7 +711,7 @@ const handleAddEvent = async () => {
     eventsModalError.value = ''
     try {
         const { data } = await apiClient.post(
-            `/api/matches/${selectedMatch.value._id}/events`,
+            `/api/matches/${idKey(selectedMatch.value._id)}/events`,
             newEvent.value
         )
         const updatedMatch = data.match
@@ -701,10 +727,12 @@ const handleAddEvent = async () => {
 }
 
 const handleDeleteEvent = async (matchId, eventId) => {
+    const mid = idKey(matchId)
+    const eid = idKey(eventId)
     try {
-        const { data } = await apiClient.delete(`/api/matches/${matchId}/events/${eventId}`)
+        const { data } = await apiClient.delete(`/api/matches/${mid}/events/${eid}`)
         const updatedMatch = data.match
-        const index = matches.value.findIndex((m) => idEq(m._id, matchId))
+        const index = matches.value.findIndex((m) => idEq(m._id, mid))
         if (index !== -1) matches.value[index] = updatedMatch
         selectedMatch.value = updatedMatch
     } catch (err) {
@@ -740,7 +768,7 @@ const handleAddPenaltyEvent = async () => {
     eventsModalError.value = ''
     try {
         const { data } = await apiClient.post(
-            `/api/matches/${selectedMatch.value._id}/penalties`,
+            `/api/matches/${idKey(selectedMatch.value._id)}/penalties`,
             newPenalty.value
         )
         const updatedMatch = data.match
@@ -761,9 +789,10 @@ const deleteMatch = async (matchId) => {
         !window.confirm('Are you sure you want to delete this match? This action cannot be undone.')
     )
         return
+    const mid = idKey(matchId)
     try {
-        await apiClient.delete(`/api/matches/${matchId}`)
-        matches.value = matches.value.filter((m) => !idEq(m._id, matchId))
+        await apiClient.delete(`/api/matches/${mid}`)
+        matches.value = matches.value.filter((m) => !idEq(m._id, mid))
     } catch (err) {
         console.error('Failed to delete match:', err)
         error.value = err.response?.data?.message || 'Failed to delete match.'
@@ -774,10 +803,11 @@ const deleteMatch = async (matchId) => {
 const finishMatch = async (matchId) => {
     closeMenu()
     if (!window.confirm('Mark this match as finished?')) return
+    const mid = idKey(matchId)
     try {
-        const { data } = await apiClient.patch(`/api/matches/${matchId}/finish`)
+        const { data } = await apiClient.patch(`/api/matches/${mid}/finish`)
         const updated = data.match
-        const idx = matches.value.findIndex((m) => idEq(m._id, matchId))
+        const idx = matches.value.findIndex((m) => idEq(m._id, mid))
         if (idx !== -1) matches.value[idx] = updated
     } catch (err) {
         console.error('Failed to finish match:', err)

@@ -146,6 +146,13 @@ const fetchInvitations = async () => {
 
 const respondToInvitation = async (invitation, response) => {
     const id = normalizeId(invitation._id)
+    const teamId = normalizeId(invitation?.data?.team?._id) || normalizeId(invitation?.data?.teamId)
+
+    if (!teamId) {
+        feedback.value = { type: 'error', text: 'Invitation is missing team ID.' }
+        return
+    }
+
     respondingId.value = id
     feedback.value = { type: '', text: '' }
 
@@ -153,18 +160,16 @@ const respondToInvitation = async (invitation, response) => {
     invitations.value = prev.filter((inv) => normalizeId(inv._id) !== id)
 
     try {
-        const result = await apiClient.post(`/api/invitations/${id}/respond`, { response })
-        feedback.value = { type: 'success', text: result?.data?.message || 'Response sent.' }
+        await apiClient.post(`/api/invitations/${id}/respond`, { response, teamId })
+        feedback.value = { type: 'success', text: 'Response sent.' }
         authStore.fetchAllNotifications?.()
-        if (response === 'accepted') {
-            setTimeout(() => router.push('/teams'), 1200)
-        }
+        if (response === 'accepted') setTimeout(() => router.push('/teams'), 1200)
     } catch (err) {
+        invitations.value = prev
         feedback.value = {
             type: 'error',
             text: err?.response?.data?.message || 'Failed to respond to invitation.',
         }
-        invitations.value = prev
     } finally {
         respondingId.value = null
     }

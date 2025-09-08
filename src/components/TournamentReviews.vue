@@ -57,7 +57,7 @@
                         v-if="r.author?.avatar && !r.__imgErr"
                         :src="avatarUrl(r)"
                         alt=""
-                        @error="onImgError(r, $event)"
+                        @error="onImgError(r)"
                     />
                     <div v-else class="placeholder">
                         <i class="fas fa-user"></i>
@@ -101,6 +101,7 @@ import { ref, computed, onMounted } from 'vue'
 import apiClient from '@/services/api'
 import StarRating from './StarRating.vue'
 import { useAuthStore } from '@/stores/auth'
+import { getImageUrl } from '@/utils/url'
 
 const props = defineProps({
     tournamentId: { type: String, required: true },
@@ -108,8 +109,8 @@ const props = defineProps({
 })
 
 const auth = useAuthStore?.() || {}
-const meId = computed(() => auth.user?._id || auth.user?.id || auth.userId || null)
-const isLoggedIn = computed(() => !!(auth.token || localStorage.getItem('token')))
+const meId = computed(() => auth.userId || null)
+const isLoggedIn = computed(() => !!auth.isLoggedIn)
 
 const items = ref([])
 const page = ref(1)
@@ -127,45 +128,17 @@ const isDeleting = ref(false)
 const saveError = ref('')
 const saveOk = ref(false)
 
-const idOf = (obj) => (typeof obj === 'object' ? obj._id || obj.id || obj.$oid : obj)
+const idOf = (obj) => {
+    if (!obj) return ''
+    const raw = typeof obj === 'object' ? obj._id ?? obj.id ?? obj.$oid : obj
+    return typeof raw === 'string' ? raw : raw?.$oid ?? String(raw || '')
+}
 const hasMore = computed(() => items.value.length < total.value)
 
-// ---- DEBUG helpers for avatar URL ----
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001').replace(/\/$/, '')
-const normalizePath = (p) => {
-    if (!p) return ''
-    let s = String(p).trim()
-    // Windows backslashes -> forward slashes
-    s = s.replace(/\\/g, '/')
-    // Ako dobijemo apsolutnu lokalnu putanju, odreži sve prije uploads/
-    s = s.replace(/^.*(?=\/uploads\/)/, '')
-    // Ako i dalje ne sadrži uploads, vrati original (možda je već full URL)
-    return s || String(p)
-}
-const avatarUrl = (r) => {
-    const raw = r?.author?.avatar
-    const norm = normalizePath(raw)
-    let url = norm
-    if (!/^https?:\/\//i.test(norm)) {
-        url = `${API_BASE}/${norm.replace(/^\//, '')}`
-    }
-    console.debug('[reviews] avatar build', {
-        reviewId: idOf(r),
-        raw,
-        normalized: norm,
-        finalUrl: url,
-    })
-    return url
-}
-const onImgError = (r, e) => {
+const avatarUrl = (r) => getImageUrl(r?.author?.avatar || '')
+const onImgError = (r) => {
     r.__imgErr = true
-    console.warn('[reviews] avatar image error', {
-        reviewId: idOf(r),
-        src: e?.target?.src,
-        author: r?.author,
-    })
 }
-// -------------------------------------
 
 function prettyDate(iso) {
     if (!iso) return ''
@@ -175,7 +148,10 @@ function prettyDate(iso) {
 }
 
 function canDelete(r) {
-    const mine = meId.value && (r.user_id === meId.value || r.author?._id === meId.value)
+    const mine =
+        meId.value &&
+        (String(r.user_id) === String(meId.value) ||
+            (r.author?._id && String(r.author._id) === String(meId.value)))
     return !!(props.isOwner || mine)
 }
 
@@ -187,29 +163,15 @@ async function load(p = 1) {
             `/api/tournaments/${props.tournamentId}/reviews?page=${p}&limit=${limit}`
         )
         const incoming = data.items || []
-        // DEBUG cijeli payload
-        console.debug('[reviews] load page', { page: p, count: incoming.length, data: incoming })
 
         if (p === 1) items.value = incoming
         else items.value = [...items.value, ...incoming]
 
-        total.value = data.total ?? data.review_count ?? (items.value?.length || 0)
+        total.value = data.review_count ?? items.value.length
         stats.value = {
-            average: data.avg_rating ?? data.stats?.average ?? 0,
-            count: data.review_count ?? data.stats?.count ?? total.value,
+            average: data.avg_rating ?? 0,
+            count: data.review_count ?? items.value.length,
         }
-
-        // ispiši avatar info po stavci
-        items.value.forEach((r) => {
-            const raw = r?.author?.avatar
-            console.debug('[reviews] item author/avatar', {
-                reviewId: idOf(r),
-                author: r.author,
-                rawAvatar: raw,
-                normalized: normalizePath(raw),
-                finalUrl: raw ? avatarUrl(r) : null,
-            })
-        })
 
         if (meId.value) {
             const mine = items.value.find(
@@ -221,6 +183,8 @@ async function load(p = 1) {
                 myExistingId.value = idOf(mine)
                 myRating.value = mine.rating || 0
                 myComment.value = mine.comment || ''
+            } else {
+                myExistingId.value = null
             }
         }
 
@@ -278,7 +242,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* (nepromijenjeni stilovi) */
 .reviews-card {
     background: #fff;
     border: 1px solid #eef1f3;

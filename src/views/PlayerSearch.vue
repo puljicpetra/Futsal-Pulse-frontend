@@ -36,7 +36,7 @@
             <ul class="grid">
                 <li
                     v-for="p in items"
-                    :key="p._id"
+                    :key="normalizeId(p._id)"
                     class="card player-card"
                     @click="goToPlayer(p._id)"
                 >
@@ -50,7 +50,9 @@
                         />
                         <div class="title">
                             <h3>{{ p.full_name || p.name || 'Unknown Player' }}</h3>
-                            <p class="muted" v-if="p.teamName">Team: {{ p.teamName }}</p>
+                            <p class="muted" v-if="p.teamName || p.team?.name">
+                                Team: {{ p.teamName || p.team?.name }}
+                            </p>
                         </div>
                     </div>
 
@@ -74,11 +76,12 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { searchPlayers } from '@/services/stats'
 
 const router = useRouter()
+const route = useRoute()
 
 const q = ref('')
 const isLoading = ref(false)
@@ -88,24 +91,34 @@ const page = ref(1)
 const limit = ref(20)
 const total = ref(0)
 
-const pages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
+const MIN_CHARS = 2
+
+const pages = computed(() => Math.max(1, Math.ceil((total.value || 0) / limit.value)))
 const hintVisible = computed(() => !q.value && items.value.length === 0 && !isLoading.value)
+
+const normalizeId = (id) => {
+    if (!id) return null
+    if (typeof id === 'string') return id
+    if (typeof id === 'object' && typeof id.$oid === 'string') return id.$oid
+    return String(id)
+}
 
 const performSearch = async (resetPage = false) => {
     if (resetPage) page.value = 1
-    if (!q.value?.trim()) {
+
+    const query = (q.value || '').trim()
+    if (query.length < MIN_CHARS) {
         items.value = []
         total.value = 0
         error.value = ''
         return
     }
+
     isLoading.value = true
     error.value = ''
+
     try {
-        const data = await searchPlayers(q.value.trim(), {
-            page: page.value,
-            limit: limit.value,
-        })
+        const data = await searchPlayers(query, { page: page.value, limit: limit.value })
         if (Array.isArray(data)) {
             items.value = data
             total.value = data.length
@@ -122,14 +135,19 @@ const performSearch = async (resetPage = false) => {
 }
 
 let t = null
-watch(q, () => {
-    window.clearTimeout(t)
-    t = window.setTimeout(() => performSearch(true), 350)
-})
+watch(
+    () => q.value,
+    () => {
+        window.clearTimeout(t)
+        syncRouteQuery()
+        t = window.setTimeout(() => performSearch(true), 350)
+    }
+)
 
 const changePage = (p) => {
     if (p < 1 || p > pages.value) return
     page.value = p
+    syncRouteQuery()
     performSearch(false)
 }
 
@@ -139,11 +157,39 @@ const clearQuery = () => {
     total.value = 0
     page.value = 1
     error.value = ''
+    syncRouteQuery()
 }
 
 const goToPlayer = (id) => {
-    router.push({ name: 'PlayerProfileStats', params: { id: String(id) } })
+    router.push({ name: 'PlayerProfileStats', params: { id: String(normalizeId(id)) } })
 }
+
+const syncRouteQuery = () => {
+    const query = {}
+    if ((q.value || '').trim()) query.q = q.value.trim()
+    if (page.value > 1) query.page = String(page.value)
+    router.replace({ query })
+}
+
+onMounted(() => {
+    const qParam = typeof route.query.q === 'string' ? route.query.q : ''
+    const pageParam = Number(route.query.page || 1)
+
+    q.value = qParam
+    page.value = Number.isFinite(pageParam) && pageParam >= 1 ? pageParam : 1
+
+    if ((q.value || '').trim().length >= MIN_CHARS) {
+        performSearch(false)
+    } else {
+        items.value = []
+        total.value = 0
+        error.value = ''
+    }
+})
+
+onBeforeUnmount(() => {
+    window.clearTimeout(t)
+})
 </script>
 
 <style scoped>

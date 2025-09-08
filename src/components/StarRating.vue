@@ -2,12 +2,8 @@
     <div
         class="star-rating"
         :class="[`size-${size}`, { readonly }]"
-        role="slider"
-        :aria-valuemin="1"
-        :aria-valuemax="max"
-        :aria-valuenow="displayValue"
-        :aria-label="ariaLabel"
-        tabindex="0"
+        v-bind="rootAria"
+        :tabindex="readonly ? undefined : 0"
         @keydown="onKeydown"
     >
         <button
@@ -17,16 +13,16 @@
             class="star-btn"
             :title="`${n} / ${max}`"
             :disabled="readonly"
-            @mouseenter="hover = n"
-            @mouseleave="hover = 0"
-            @focus="hover = n"
-            @blur="hover = 0"
+            @mouseenter="onHover(n)"
+            @mouseleave="onHover(0)"
+            @focus="onHover(n)"
+            @blur="onHover(0)"
             @click="set(n)"
         >
-            <i :class="iconClass(n)"></i>
+            <i :class="iconClass(n)" aria-hidden="true"></i>
         </button>
 
-        <span v-if="showValue" class="value">{{ displayValue.toFixed(1) }}</span>
+        <span v-if="showValue" class="value">{{ Number(displayValue).toFixed(1) }}</span>
     </div>
 </template>
 
@@ -46,35 +42,68 @@ const emit = defineEmits(['update:modelValue'])
 
 const hover = ref(0)
 
-const displayValue = computed(() => {
-    return hover.value || props.modelValue || 0
+const displayValue = computed(() => hover.value || props.modelValue || 0)
+
+const rootAria = computed(() => {
+    if (props.readonly) {
+        return {
+            role: 'img',
+            'aria-label': `${props.ariaLabel}: ${displayValue.value} of ${props.max}`,
+        }
+    }
+    const now = Math.max(0, Math.min(props.max, Number(props.modelValue || 0)))
+    return {
+        role: 'slider',
+        'aria-valuemin': 0,
+        'aria-valuemax': props.max,
+        'aria-valuenow': now,
+        'aria-valuetext': `${now} of ${props.max}`,
+        'aria-label': props.ariaLabel,
+    }
 })
 
 function set(n) {
     if (props.readonly) return
-    emit('update:modelValue', n)
+    const clamped = Math.max(0, Math.min(props.max, Number(n)))
+    emit('update:modelValue', clamped)
+}
+
+function onHover(n) {
+    if (props.readonly) return
+    hover.value = Number(n) || 0
 }
 
 function iconClass(n) {
     if (props.readonly && typeof props.modelValue === 'number') {
         const v = props.modelValue
         if (n <= Math.floor(v)) return 'fas fa-star'
-        if (n === Math.floor(v) + 1 && v % 1 >= 0.5) return 'fas fa-star-half-alt'
+        if (n === Math.floor(v) + 1 && v % 1 >= 0.5) return 'fas fa-star-half-stroke'
         return 'far fa-star'
     }
-
-    const v = displayValue.value
+    const v = Number(displayValue.value) || 0
     return n <= v ? 'fas fa-star' : 'far fa-star'
 }
 
 function onKeydown(e) {
     if (props.readonly) return
+    const cur = Number(props.modelValue || 0)
     if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
         e.preventDefault()
-        emit('update:modelValue', Math.min((props.modelValue || 0) + 1, props.max))
+        emit('update:modelValue', Math.min(cur + 1, props.max))
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
         e.preventDefault()
-        emit('update:modelValue', Math.max((props.modelValue || 0) - 1, 1))
+        emit('update:modelValue', Math.max(cur - 1, 0))
+    } else if (e.key === 'Home') {
+        e.preventDefault()
+        emit('update:modelValue', 0)
+    } else if (e.key === 'End') {
+        e.preventDefault()
+        emit('update:modelValue', props.max)
+    } else if (e.key === 'Enter' || e.key === ' ') {
+        if (hover.value) {
+            e.preventDefault()
+            set(hover.value)
+        }
     }
 }
 </script>
@@ -106,7 +135,7 @@ function onKeydown(e) {
 }
 
 .star-btn i.fas.fa-star,
-.star-btn i.fas.fa-star-half-alt {
+.star-btn i.fas.fa-star-half-stroke {
     color: #f59e0b;
 }
 .star-btn i.far.fa-star {

@@ -14,7 +14,11 @@
                     >
                     <select id="tournament-filter" v-model="filters.tournamentId">
                         <option :value="null">All Tournaments</option>
-                        <option v-for="t in allTournaments" :key="t._id" :value="t._id">
+                        <option
+                            v-for="t in allTournaments"
+                            :key="oidString(t._id)"
+                            :value="oidString(t._id)"
+                        >
                             {{ t.name }}
                         </option>
                     </select>
@@ -25,7 +29,11 @@
                     >
                     <select id="team-filter" v-model="filters.teamId">
                         <option :value="null">All Teams</option>
-                        <option v-for="t in allTeams" :key="t._id" :value="t._id">
+                        <option
+                            v-for="t in allTeams"
+                            :key="oidString(t._id)"
+                            :value="oidString(t._id)"
+                        >
                             {{ t.name }}
                         </option>
                     </select>
@@ -55,8 +63,8 @@
                     <div class="matches-list">
                         <router-link
                             v-for="match in group.matches"
-                            :key="match._id"
-                            :to="`/matches/${match._id}`"
+                            :key="oidString(match._id)"
+                            :to="`/matches/${oidString(match._id)}`"
                             class="match-card-link"
                         >
                             <div class="match-card">
@@ -161,6 +169,13 @@ const LABELS = {
 }
 const labelForStage = (s) => LABELS[s] || '—'
 
+const oidString = (v) =>
+    typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : '')
+
+const safeDateNum = (d) => {
+    const n = new Date(d).getTime()
+    return Number.isFinite(n) ? n : 0
+}
 const toLocalDateKey = (dateString) => {
     const d = new Date(dateString)
     const pad = (n) => String(n).padStart(2, '0')
@@ -179,7 +194,7 @@ const fetchMatches = async () => {
         if (filters.value.teamId) params.append('teamId', filters.value.teamId)
         const qs = params.toString()
         const { data } = await apiClient.get(`/api/matches${qs ? `?${qs}` : ''}`)
-        allMatches.value = data || []
+        allMatches.value = Array.isArray(data) ? data : []
     } catch (err) {
         error.value = err.response?.data?.message || 'Failed to fetch matches.'
     } finally {
@@ -211,7 +226,9 @@ const groupedMatches = computed(() => {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, matches]) => ({
             date,
-            matches: matches.slice().sort((a, b) => new Date(a.matchDate) - new Date(b.matchDate)),
+            matches: matches
+                .slice()
+                .sort((a, b) => safeDateNum(a.matchDate) - safeDateNum(b.matchDate)),
         }))
 })
 
@@ -244,14 +261,15 @@ const formatDateGroup = (dateString) => {
 }
 
 const formatTime = (dateString) => {
+    if (!dateString) return ''
     const locale = navigator.language || undefined
     const options = { hour: '2-digit', minute: '2-digit', hour12: false }
     return new Date(dateString).toLocaleTimeString(locale, options)
 }
 
 onMounted(() => {
-    if (route.query.tournamentId) filters.value.tournamentId = route.query.tournamentId
-    if (route.query.teamId) filters.value.teamId = route.query.teamId
+    if (route.query.tournamentId) filters.value.tournamentId = String(route.query.tournamentId)
+    if (route.query.teamId) filters.value.teamId = String(route.query.teamId)
     fetchMatches()
     fetchFilterData()
 })
@@ -493,7 +511,7 @@ h1 {
 
 @keyframes spin {
     0% {
-        transform: rotate(0deg);
+        transform: rotate(0);
     }
     100% {
         transform: rotate(360deg);

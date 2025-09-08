@@ -70,15 +70,11 @@
                         <li v-for="m in logItems" :key="m.matchId || m._id" class="match-row">
                             <div class="left">
                                 <div class="title-line">
-                                    <strong>{{
-                                        (m.teamAName || m.teamA)?.name || 'Team A'
-                                    }}</strong>
+                                    <strong>{{ sideName(m, 'teamA') }}</strong>
                                     <span class="score">
                                         {{ scoreline(m) }}
                                     </span>
-                                    <strong>{{
-                                        (m.teamBName || m.teamB)?.name || 'Team B'
-                                    }}</strong>
+                                    <strong>{{ sideName(m, 'teamB') }}</strong>
                                 </div>
                                 <div class="meta">
                                     <span>{{ formatDate(m.matchDate || m.date) }}</span>
@@ -253,6 +249,13 @@ const scoreline = (m) => {
         return `${baseA} : ${baseB} (${pa}-${pb})`
     }
     return `${baseA} : ${baseB}`
+}
+
+const sideName = (m, side) => {
+    const obj = m?.[side]
+    const fromNameField = m?.[`${side}Name`]
+    if (typeof obj === 'string') return obj
+    return obj?.name || fromNameField || (side === 'teamA' ? 'Team A' : 'Team B')
 }
 
 const formatDate = (v) => {

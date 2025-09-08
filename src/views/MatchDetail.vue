@@ -31,7 +31,7 @@
                     </span>
                     <div class="meta-line">
                         <span v-if="match.status === 'finished'">FT</span>
-                        <span v-else>{{ prettyDateTime(match.matchDate) }}</span>
+                        <span v-else>{{ prettyDateTime(match.matchDate) || 'TBD' }}</span>
                         <span v-if="match.stage" class="stage-chip">{{
                             labelForStage(match.stage)
                         }}</span>

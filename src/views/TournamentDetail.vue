@@ -86,7 +86,7 @@
 
                     <TeamList
                         ref="teamListComp"
-                        :tournamentId="tournament._id"
+                        :tournamentId="tId"
                         :isOwner="isOwner"
                         @feedback="showFeedback"
                         @registrations-loaded="handleRegistrationsLoaded"
@@ -94,7 +94,7 @@
 
                     <TournamentReviews
                         v-if="tournament"
-                        :tournament-id="tournament._id"
+                        :tournament-id="tId"
                         :is-owner="isOwner"
                         class="card"
                     />
@@ -103,7 +103,7 @@
                 <aside class="sidebar-content">
                     <MatchListSummary
                         ref="matchListSummaryComp"
-                        :tournamentId="tournament._id"
+                        :tournamentId="tId"
                         :isOwner="isOwner"
                         @add-match="openAddMatchModal"
                     />
@@ -290,12 +290,13 @@ const teamListComp = ref(null)
 const matchListSummaryComp = ref(null)
 
 const oidString = (v) =>
-    typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : null)
+    typeof v === 'string' ? v : v?.$oid ?? (typeof v?.toString === 'function' ? v.toString() : '')
 const idEq = (a, b) => {
     const sa = oidString(a),
         sb = oidString(b)
     return !!sa && !!sb && String(sa) === String(sb)
 }
+const tId = computed(() => oidString(tournament.value?._id))
 
 const isOwner = computed(() => {
     if (!authStore.isLoggedIn || !tournament.value) return false
@@ -356,12 +357,12 @@ const handleRegistrationsLoaded = (loadedRegistrations) => {
     approvedRegistrations.value = loadedRegistrations.filter((r) => r.status === 'approved')
 }
 
-const goToEdit = () => router.push(`/tournaments/${tournament.value._id}/edit`)
+const goToEdit = () => router.push(`/tournaments/${tId.value}/edit`)
 
 const confirmDelete = async () => {
     if (window.confirm('Are you sure you want to permanently delete this tournament?')) {
         try {
-            await apiClient.delete(`/api/tournaments/${tournament.value._id}`)
+            await apiClient.delete(`/api/tournaments/${tId.value}`)
             router.push('/tournaments')
         } catch (err) {
             showFeedback({
@@ -477,7 +478,7 @@ const submitRegistration = async () => {
     try {
         await apiClient.post('/api/registrations', {
             teamId: selectedTeamId.value,
-            tournamentId: tournament.value._id,
+            tournamentId: tId.value,
         })
         closeRegisterModal()
         showFeedback({ type: 'success', text: 'Team successfully registered! Status is pending.' })

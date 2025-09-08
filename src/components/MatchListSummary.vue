@@ -387,10 +387,22 @@ function handleDocClick(e) {
 const idOf = (obj) => {
     if (!obj) return ''
     if (typeof obj === 'string') return obj
+
+    if (obj && typeof obj === 'object' && typeof obj.$oid === 'string') {
+        return obj.$oid
+    }
+
     const raw = obj._id ?? obj.id
-    if (!raw) return ''
-    return typeof raw === 'string' ? raw : raw?.$oid ?? String(raw)
+    if (typeof raw === 'string') return raw
+    if (raw && typeof raw === 'object' && typeof raw.$oid === 'string') return raw.$oid
+
+    if (obj && typeof obj.toString === 'function') {
+        const s = obj.toString()
+        if (/^[0-9a-fA-F]{24}$/.test(s)) return s
+    }
+    return ''
 }
+
 const labelForStage = (s) => LABELS[s] || '—'
 const toStageTitle = (s) => labelForStage(s)
 const prettyDateTime = (iso) => {
@@ -437,22 +449,28 @@ const eligiblePlayers = computed(() => {
     return team?.players || []
 })
 
-const takenPenaltyPlayerIdsForTeam = (teamId) => {
-    const events = currentMatch.value?.penalty_shootout?.events || []
+const penaltyCountsForTeam = (teamId, roster) => {
+    const counts = new Map((roster || []).map((p) => [idOf(p), 0]))
+    const evs = currentMatch.value?.penalty_shootout?.events || []
     const tid = idOf(teamId)
-    const set = new Set()
-    for (const e of events) {
-        if (idOf(e.teamId) === tid) set.add(idOf(e.playerId))
+    for (const e of evs) {
+        if (idOf(e.teamId) === tid) {
+            const pid = idOf(e.playerId)
+            counts.set(pid, (counts.get(pid) || 0) + 1)
+        }
     }
-    return set
+    return counts
 }
 
 const penaltyPlayers = computed(() => {
     if (!currentMatch.value || !newPenalty.value.teamId) return []
     const isA = idOf(currentMatch.value.teamA) === newPenalty.value.teamId
     const team = isA ? currentMatch.value.teamA : currentMatch.value.teamB
-    const taken = takenPenaltyPlayerIdsForTeam(newPenalty.value.teamId)
-    return (team?.players || []).filter((p) => !taken.has(idOf(p)))
+    const roster = team?.players || []
+    const counts = penaltyCountsForTeam(newPenalty.value.teamId, roster)
+    const vals = Array.from(counts.values())
+    const min = vals.length ? Math.min(...vals) : 0
+    return roster.filter((p) => (counts.get(idOf(p)) || 0) === min)
 })
 
 const sortedEvents = computed(() => {

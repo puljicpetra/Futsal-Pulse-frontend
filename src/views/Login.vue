@@ -4,9 +4,23 @@
             <div class="login-box">
                 <h2>Login</h2>
                 <form @submit.prevent="login">
-                    <input type="text" v-model="username" placeholder="Username" required />
+                    <input
+                        type="text"
+                        v-model="username"
+                        placeholder="Username"
+                        required
+                        autocomplete="username"
+                        name="username"
+                    />
 
-                    <input type="password" v-model="password" placeholder="Password" required />
+                    <input
+                        type="password"
+                        v-model="password"
+                        placeholder="Password"
+                        required
+                        autocomplete="current-password"
+                        name="password"
+                    />
 
                     <button type="submit" :disabled="isLoggingIn">
                         {{ isLoggingIn ? 'Logging in...' : 'Login' }}
@@ -54,13 +68,11 @@ async function login() {
 
         await authStore.login(uname, pwd)
 
-        const dest =
-            typeof route.query.redirect === 'string' && route.query.redirect
-                ? route.query.redirect
-                : '/'
-        if (dest !== '/') {
-            router.push(dest)
-        }
+        const q = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+        const dest = q && q.startsWith('/') ? q : '/'
+        router.replace(dest)
+
+        password.value = ''
     } catch (err) {
         error.value =
             err?.response?.data?.message ||

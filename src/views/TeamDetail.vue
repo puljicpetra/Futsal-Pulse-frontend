@@ -44,7 +44,7 @@
                         >
                             <li
                                 v-for="player in team.players"
-                                :key="player._id"
+                                :key="oidString(player._id)"
                                 class="player-item"
                             >
                                 <div class="player-info">
@@ -123,7 +123,7 @@
                             <ul v-if="searchResults.length > 0" class="search-results-list">
                                 <li
                                     v-for="player in searchResults"
-                                    :key="player._id"
+                                    :key="oidString(player._id)"
                                     class="search-result-item"
                                 >
                                     <div class="player-info">
@@ -146,14 +146,18 @@
                                     <button
                                         @click="invitePlayer(player._id, player.username)"
                                         :disabled="
-                                            invitingPlayerId === player._id ||
+                                            (invitingPlayerId &&
+                                                idEq(invitingPlayerId, player._id)) ||
                                             player.inviteStatus === 'pending'
                                         "
                                         class="btn-invite"
                                         :class="{ pending: player.inviteStatus === 'pending' }"
                                     >
                                         <div
-                                            v-if="invitingPlayerId === player._id"
+                                            v-if="
+                                                invitingPlayerId &&
+                                                idEq(invitingPlayerId, player._id)
+                                            "
                                             class="spinner-sm-light"
                                         ></div>
                                         <span v-else-if="player.inviteStatus === 'pending'"
@@ -244,7 +248,9 @@ const fetchTeamDetails = async () => {
     error.value = ''
     try {
         const response = await apiClient.get(`/api/teams/${teamId}`)
-        team.value = response.data
+        const data = response.data || {}
+        if (!Array.isArray(data.players)) data.players = []
+        team.value = data
     } catch (err) {
         console.error('Error fetching team details:', err)
         error.value = err.response?.data?.message || 'Failed to fetch team details.'
@@ -268,7 +274,14 @@ const searchPlayers = async () => {
         const response = await apiClient.get('/api/users/search', {
             params: { query: searchQuery.value },
         })
-        const existingIds = new Set((team.value?.players ?? []).map((p) => oidString(p._id)))
+        const existingIds = new Set(
+            [
+                ...(team.value?.players ?? []).map((p) => oidString(p._id)),
+                oidString(team.value?.captain?._id ?? team.value?.captain),
+                oidString(authStore.userId),
+            ].filter(Boolean)
+        )
+
         searchResults.value = (response.data || [])
             .filter((player) => !existingIds.has(oidString(player._id)))
             .map((player) => ({ ...player, inviteStatus: 'idle' }))
@@ -280,12 +293,17 @@ const searchPlayers = async () => {
 }
 
 const invitePlayer = async (playerId, playerUsername) => {
-    invitingPlayerId.value = playerId
+    const pid = oidString(playerId)
+    if (!pid) {
+        inviteMessage.value = { type: 'error', text: 'Invalid player ID.' }
+        return
+    }
+    invitingPlayerId.value = pid
     inviteMessage.value = { type: '', text: '' }
     try {
-        await apiClient.post(`/api/teams/${teamId}/invites`, { playerId })
+        await apiClient.post(`/api/teams/${teamId}/invites`, { playerId: pid })
         inviteMessage.value = { type: 'success', text: `Successfully invited ${playerUsername}!` }
-        const playerIndex = searchResults.value.findIndex((p) => idEq(p._id, playerId))
+        const playerIndex = searchResults.value.findIndex((p) => idEq(p._id, pid))
         if (playerIndex > -1) {
             searchResults.value.splice(playerIndex, 1)
         }
@@ -293,7 +311,7 @@ const invitePlayer = async (playerId, playerUsername) => {
         const errorMessage = err.response?.data?.message || 'Failed to send invitation.'
         inviteMessage.value = { type: 'error', text: errorMessage }
         if (/already been invited/i.test(errorMessage)) {
-            const playerIndex = searchResults.value.findIndex((p) => idEq(p._id, playerId))
+            const playerIndex = searchResults.value.findIndex((p) => idEq(p._id, pid))
             if (playerIndex > -1) {
                 searchResults.value[playerIndex].inviteStatus = 'pending'
             }
@@ -304,12 +322,17 @@ const invitePlayer = async (playerId, playerUsername) => {
 }
 
 const removePlayer = async (playerId, playerUsername) => {
+    const pid = oidString(playerId)
+    if (!pid) {
+        removePlayerMessage.value = { type: 'error', text: 'Invalid player ID.' }
+        return
+    }
     if (window.confirm(`Are you sure you want to remove ${playerUsername} from the team?`)) {
         removePlayerMessage.value = { type: '', text: '' }
         try {
-            await apiClient.delete(`/api/teams/${teamId}/players/${playerId}`)
+            await apiClient.delete(`/api/teams/${teamId}/players/${pid}`)
             if (team.value) {
-                team.value.players = team.value.players.filter((p) => !idEq(p._id, playerId))
+                team.value.players = team.value.players.filter((p) => !idEq(p._id, pid))
             }
             removePlayerMessage.value = {
                 type: 'success',
