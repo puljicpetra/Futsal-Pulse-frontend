@@ -102,7 +102,7 @@
                         id="tournamentImage"
                         @change="handleFileChange"
                         class="file-input"
-                        accept="image/png, image/jpeg"
+                        accept="image/png, image/jpeg, image/jpg, .png, .jpg, .jpeg"
                     />
                     <p v-if="fileError" class="error-message" style="margin-top: 0.5rem">
                         {{ fileError }}
@@ -153,7 +153,7 @@ const fileError = ref('')
 
 const MAX_MB = 5
 const DESC_MAX = 5000
-const ALLOWED_TYPES = ['image/jpeg', 'image/png']
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
 
 const toDate = (yyyy_mm_dd) => {
     if (!yyyy_mm_dd) return null
