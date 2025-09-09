@@ -21,6 +21,7 @@
 
             <header class="tournament-header">
                 <h1>{{ tournament.name }}</h1>
+
                 <div class="header-meta">
                     <span v-if="tournament.location?.city">
                         <i class="fas fa-map-marker-alt"></i>
@@ -28,12 +29,12 @@
                         {{ tournament.location?.venue ? `, ${tournament.location.venue}` : '' }}
                     </span>
                     <span>
-                        <i class="fas fa-calendar-alt"></i> Starts:
-                        {{ formatDate(tournament.startDate) }}
+                        <i class="fas fa-calendar-alt"></i>
+                        Starts: {{ formatDate(tournament.startDate) }}
                     </span>
                     <span v-if="tournament.endDate">
-                        <i class="fas fa-flag-checkered"></i> Ends:
-                        {{ formatDate(tournament.endDate) }}
+                        <i class="fas fa-flag-checkered"></i>
+                        Ends: {{ formatDate(tournament.endDate) }}
                     </span>
                 </div>
 
@@ -76,6 +77,12 @@
 
             <main class="tournament-body">
                 <div class="main-content">
+                    <TournamentAnnouncements
+                        :tournament-id="tId"
+                        :tournament="tournament"
+                        class="card"
+                    />
+
                     <section class="rules-section card">
                         <h2><i class="fas fa-gavel"></i> Tournament Rules</h2>
                         <p v-if="tournament.rules" class="rules-text">{{ tournament.rules }}</p>
@@ -83,20 +90,6 @@
                             No specific rules have been provided by the organizer.
                         </p>
                     </section>
-
-                    <TournamentAnnouncements
-                        :tournament-id="tId"
-                        :tournament="tournament"
-                        class="card"
-                    />
-
-                    <TeamList
-                        ref="teamListComp"
-                        :tournamentId="tId"
-                        :isOwner="isOwner"
-                        @feedback="showFeedback"
-                        @registrations-loaded="handleRegistrationsLoaded"
-                    />
 
                     <TournamentReviews
                         v-if="tournament"
@@ -107,12 +100,21 @@
                 </div>
 
                 <aside class="sidebar-content">
-                    <MatchListSummary
-                        ref="matchListSummaryComp"
-                        :tournamentId="tId"
-                        :isOwner="isOwner"
-                        @add-match="openAddMatchModal"
-                    />
+                    <div class="sidebar-stack">
+                        <MatchListSummary
+                            ref="matchListSummaryComp"
+                            :tournamentId="tId"
+                            :isOwner="isOwner"
+                            @add-match="openAddMatchModal"
+                        />
+                        <TeamList
+                            ref="teamListComp"
+                            :tournamentId="tId"
+                            :isOwner="isOwner"
+                            @feedback="showFeedback"
+                            @registrations-loaded="handleRegistrationsLoaded"
+                        />
+                    </div>
                 </aside>
             </main>
         </div>
@@ -524,7 +526,6 @@ const closeAddMatchModal = () => {
 
 const submitNewMatch = async () => {
     if (isSubmittingMatch.value) return
-
     if (newMatch.value.teamA_id && newMatch.value.teamA_id === newMatch.value.teamB_id) {
         matchModalError.value = 'A team cannot play against itself.'
         return
@@ -596,7 +597,7 @@ onMounted(async () => {
 <style scoped>
 .tournament-detail-page {
     padding: 2rem;
-    background-color: #f9f9f9;
+    background-color: #f6f7fb;
     min-height: calc(100vh - 60px);
 }
 .tournament-content {
@@ -604,7 +605,7 @@ onMounted(async () => {
     margin: 0 auto;
 }
 .navigation-container {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.25rem;
 }
 .back-link {
     display: inline-flex;
@@ -625,33 +626,58 @@ onMounted(async () => {
 .back-link:hover i {
     transform: translateX(-3px);
 }
+
 .tournament-header {
-    position: relative;
     text-align: center;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid #e0e0e0;
-    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #e6e7eb;
 }
-.actions-container {
-    margin-top: 1.5rem;
+.tournament-header h1 {
+    font-size: 3rem;
+    color: #333;
+    margin: 0;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+}
+.header-meta {
     display: flex;
     justify-content: center;
+    flex-wrap: wrap;
     gap: 1rem;
+    color: #6b7280;
+    margin-top: 0.75rem;
+}
+.header-meta i {
+    margin-right: 0.5rem;
+    color: #00aeef;
+}
+
+.actions-container {
+    margin-top: 1.25rem;
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
     flex-wrap: wrap;
     align-items: center;
 }
+.organizer-actions {
+    display: inline-flex;
+    gap: 0.4rem;
+}
+
 .btn-edit,
 .btn-delete,
 .btn-register-team {
     padding: 0.6rem 1.2rem;
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
+    border-radius: 10px;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.2s;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 .btn-edit {
     background-color: #ffc107;
@@ -677,62 +703,85 @@ onMounted(async () => {
     background-color: #008fbf;
     transform: translateY(-2px);
 }
-.tournament-header h1 {
-    font-size: 3rem;
-    color: #333;
-    margin: 0;
-    font-weight: 700;
-}
-.header-meta {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-    color: #777;
+
+.feedback-message {
+    padding: 0.75rem 1.25rem;
+    border-radius: 10px;
+    font-weight: 600;
     margin-top: 1rem;
+    text-align: center;
 }
-.header-meta span {
-    display: flex;
-    align-items: center;
+.feedback-message.success {
+    background-color: #d4edda;
+    color: #155724;
 }
-.header-meta i {
-    margin-right: 0.5rem;
-    color: #00aeef;
+.feedback-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
 }
+.feedback-message.pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+.feedback-message.small {
+    padding: 0.5rem 1rem;
+    margin-top: 0;
+}
+
 .tournament-body {
     display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 2rem;
+    grid-template-columns: 1.65fr 1fr;
+    gap: 1.25rem;
     align-items: start;
 }
 @media (max-width: 1024px) {
-    .tournament-body {
-        grid-template-columns: 1fr;
+    .sidebar-stack {
+        margin-top: 0;
     }
 }
+
+.main-content {
+    display: grid;
+    grid-auto-flow: row;
+    gap: 1rem;
+}
+
 .card {
     background: #fff;
-    padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    padding: 1.5rem;
+    border-radius: 14px;
+    border: 1px solid #eaecef;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
 }
 .card h2 {
-    font-size: 1.5rem;
-    color: #333;
+    font-size: 1.25rem;
+    color: #111827;
     margin-top: 0;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #eef0f3;
+    padding-bottom: 0.6rem;
     display: flex;
     align-items: center;
 }
 .card h2 i {
-    margin-right: 0.75rem;
+    margin-right: 0.65rem;
     color: #00aeef;
 }
 .rules-text {
     line-height: 1.7;
     white-space: pre-wrap;
 }
+
+.sidebar-content {
+    position: static;
+    top: auto;
+}
+.sidebar-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-top: 1.25rem;
+}
+
 .text-muted,
 .muted {
     color: #888;
@@ -755,9 +804,10 @@ onMounted(async () => {
     background-color: #00aeef;
     color: #fff;
     text-decoration: none;
-    border-radius: 5px;
-    font-weight: bold;
+    border-radius: 8px;
+    font-weight: 700;
 }
+
 .spinner {
     border: 4px solid #f3f3f3;
     border-top: 4px solid #00aeef;
@@ -775,12 +825,10 @@ onMounted(async () => {
         transform: rotate(360deg);
     }
 }
+
 .modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     background-color: rgba(0, 0, 0, 0.6);
     display: flex;
     justify-content: center;
@@ -795,20 +843,8 @@ onMounted(async () => {
     max-width: 500px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
-.modal-content h3 {
-    margin-top: 0;
-}
-.modal-content p {
-    color: #666;
-    margin-bottom: 1.5rem;
-}
 .modal-content .form-group {
-    margin-top: 1.5rem;
-}
-.modal-content label {
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    display: block;
+    margin-top: 1.25rem;
 }
 .modal-content select,
 .modal-content input {
@@ -861,28 +897,20 @@ onMounted(async () => {
 .small-text a:hover {
     text-decoration: underline;
 }
-.feedback-message {
-    padding: 0.75rem 1.25rem;
-    border-radius: 8px;
-    font-weight: 500;
-    margin-top: 1.5rem;
-    font-size: 0.95rem;
-    text-align: center;
+.main-content :deep(h2),
+.sidebar-stack :deep(h2) {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    color: #111827;
+    margin: 0 0 0.75rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
 }
-.feedback-message.success {
-    background-color: #d4edda;
-    color: #155724;
-}
-.feedback-message.error {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-.feedback-message.pending {
-    background-color: #fff3cd;
-    color: #856404;
-}
-.feedback-message.small {
-    padding: 0.5rem 1rem;
-    margin-top: 0;
+
+.main-content :deep(h2 i),
+.sidebar-stack :deep(h2 i) {
+    color: #00aeef;
 }
 </style>

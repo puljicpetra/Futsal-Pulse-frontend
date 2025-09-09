@@ -29,15 +29,18 @@
                     <span v-if="isSaving" class="spinner-sm"></span>
                     <span v-else>Save review</span>
                 </button>
+
                 <button
                     v-if="myExistingId"
-                    class="btn subtle"
+                    class="icon-btn danger"
                     :disabled="isSaving || isDeleting"
                     @click="remove(myExistingId)"
                     title="Delete your review"
+                    aria-label="Delete your review"
                 >
-                    Delete
+                    <i class="fas fa-trash"></i>
                 </button>
+
                 <span v-if="saveError" class="error">{{ saveError }}</span>
                 <span v-if="saveOk" class="ok">Saved.</span>
             </div>
@@ -72,8 +75,9 @@
 
                         <button
                             v-if="canDelete(r)"
-                            class="icon-btn tiny danger"
+                            class="icon-btn danger"
                             title="Delete review"
+                            aria-label="Delete review"
                             @click="remove(idOf(r))"
                         >
                             <i class="fas fa-trash"></i>
@@ -275,6 +279,7 @@ onMounted(() => {
 .stats .count {
     color: #6b7280;
 }
+
 .my-review {
     background: #fafbfc;
     border: 1px solid #eef1f3;
@@ -307,6 +312,7 @@ textarea {
     align-items: center;
     gap: 0.5rem;
 }
+
 .btn {
     border: 1px solid #dcdcdc;
     background: #fff;
@@ -324,9 +330,7 @@ textarea {
     opacity: 0.7;
     cursor: not-allowed;
 }
-.btn.subtle {
-    background: #f5f6f7;
-}
+
 .spinner-sm {
     border: 2px solid rgba(255, 255, 255, 0.35);
     border-top: 2px solid #fff;
@@ -345,11 +349,13 @@ textarea {
         transform: rotate(360deg);
     }
 }
+
 .sep {
     margin: 0.9rem 0;
     border: 0;
     border-top: 1px solid #eef1f3;
 }
+
 .review-list {
     list-style: none;
     padding: 0;
@@ -393,17 +399,42 @@ textarea {
     font-size: 0.9rem;
     margin-left: auto;
 }
-.icon-btn.tiny {
-    width: 26px;
-    height: 26px;
-    border-radius: 6px;
-    background: #fdebed;
-    border: 1px solid #f1d2d6;
-    color: #c82333;
+
+.icon-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: #9ca3af;
     display: grid;
     place-items: center;
-    margin-left: 0.35rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
+.icon-btn .fas {
+    font-size: 14px;
+}
+.icon-btn:hover {
+    color: #6b7280;
+    transform: translateY(-1px);
+}
+.icon-btn:focus-visible {
+    outline: 2px solid rgba(0, 174, 239, 0.35);
+    outline-offset: 2px;
+}
+.icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.icon-btn.danger {
+    color: #c82333;
+}
+.icon-btn.danger:hover {
+    color: #a61e2a;
+}
+
 .comment {
     margin: 0.25rem 0 0;
     color: #1f2937;
