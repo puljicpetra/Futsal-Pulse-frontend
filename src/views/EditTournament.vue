@@ -89,10 +89,10 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="rules">Rules & Description</label>
+                    <label for="description">Description</label>
                     <textarea
-                        id="rules"
-                        v-model.trim="tournament.rules"
+                        id="description"
+                        v-model.trim="tournament.description"
                         rows="6"
                         maxlength="5000"
                     ></textarea>
@@ -167,7 +167,7 @@ const dateError = ref('')
 const fileError = ref('')
 
 const MAX_MB = 5
-const RULES_MAX = 5000
+const DESC_MAX = 5000
 const ALLOWED_TYPES = ['image/jpeg', 'image/png']
 
 const formatDateForInput = (dateString) => {
@@ -213,7 +213,8 @@ const isFormValid = computed(() => {
     if (!tournament.value?.location?.city?.trim()) return false
     if (!formattedStartDate.value) return false
     if (!tournament.value?.surface) return false
-    if (tournament.value?.rules && tournament.value.rules.length > RULES_MAX) return false
+    if (tournament.value?.description && tournament.value.description.length > DESC_MAX)
+        return false
     if (dateError.value) return false
     if (fileError.value) return false
     return true
@@ -284,8 +285,8 @@ const submitUpdate = async () => {
     if (isSubmitting.value) return
     if (!isFormValid.value) return
 
-    if (tournament.value.rules && tournament.value.rules.length > RULES_MAX) {
-        updateError.value = `Rules text is too long (max ${RULES_MAX} characters).`
+    if (tournament.value.description && tournament.value.description.length > DESC_MAX) {
+        updateError.value = `Description is too long (max ${DESC_MAX} characters).`
         return
     }
 
@@ -305,8 +306,8 @@ const submitUpdate = async () => {
     formData.append('startDate', formattedStartDate.value)
     if (formattedEndDate.value) formData.append('endDate', formattedEndDate.value)
     formData.append('surface', tournament.value.surface)
-    if (typeof tournament.value.rules === 'string') {
-        formData.append('rules', tournament.value.rules.trim())
+    if (typeof tournament.value.description === 'string') {
+        formData.append('description', tournament.value.description.trim())
     }
 
     if (newImageFile.value) {

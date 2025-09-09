@@ -85,13 +85,13 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="rules">Rules & Description</label>
+                    <label for="description">Description</label>
                     <textarea
-                        id="rules"
-                        v-model.trim="tournament.rules"
+                        id="description"
+                        v-model.trim="tournament.description"
                         rows="6"
                         maxlength="5000"
-                        placeholder="Describe the tournament format, rules, prizes..."
+                        placeholder="Describe the tournament: format, schedule, prizes..."
                     ></textarea>
                 </div>
 
@@ -139,7 +139,7 @@ const tournament = ref({
     location: { city: '', venue: '' },
     startDate: '',
     endDate: '',
-    rules: '',
+    description: '',
     surface: '',
 })
 
@@ -152,7 +152,7 @@ const dateError = ref('')
 const fileError = ref('')
 
 const MAX_MB = 5
-const RULES_MAX = 5000
+const DESC_MAX = 5000
 const ALLOWED_TYPES = ['image/jpeg', 'image/png']
 
 const toDate = (yyyy_mm_dd) => {
@@ -178,7 +178,7 @@ const isFormValid = computed(() => {
     if (!tournament.value.location.city.trim()) return false
     if (!tournament.value.startDate) return false
     if (!tournament.value.surface) return false
-    if (tournament.value.rules && tournament.value.rules.length > RULES_MAX) return false
+    if (tournament.value.description && tournament.value.description.length > DESC_MAX) return false
     if (dateError.value) return false
     if (fileError.value) return false
     return true
@@ -211,8 +211,8 @@ const submitTournament = async () => {
     if (isSubmitting.value) return
     if (!isFormValid.value) return
 
-    if (tournament.value.rules && tournament.value.rules.length > RULES_MAX) {
-        error.value = `Rules text is too long (max ${RULES_MAX} characters).`
+    if (tournament.value.description && tournament.value.description.length > DESC_MAX) {
+        error.value = `Description is too long (max ${DESC_MAX} characters).`
         return
     }
 
@@ -231,7 +231,7 @@ const submitTournament = async () => {
     formData.append('startDate', t.startDate)
     formData.append('surface', t.surface)
     if (t.endDate) formData.append('endDate', t.endDate)
-    if (t.rules?.trim()) formData.append('rules', t.rules.trim())
+    if (t.description?.trim()) formData.append('description', t.description.trim())
     if (tournamentImageFile.value) formData.append('tournamentImage', tournamentImageFile.value)
 
     try {

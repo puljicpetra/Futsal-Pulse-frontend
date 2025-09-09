@@ -20,7 +20,7 @@
             </div>
 
             <header class="tournament-header">
-                <h1>{{ tournament.name }}</h1>
+                <h1 class="tournament-title">{{ tournament.name }}</h1>
 
                 <div class="header-meta">
                     <span v-if="tournament.location?.city">
@@ -83,11 +83,19 @@
                         class="card"
                     />
 
-                    <section class="rules-section card">
-                        <h2><i class="fas fa-gavel"></i> Tournament Rules</h2>
-                        <p v-if="tournament.rules" class="rules-text">{{ tournament.rules }}</p>
+                    <section class="about-section card">
+                        <h2 class="card-title">
+                            <i class="fas fa-info-circle"></i>
+                            About the Tournament
+                        </h2>
+                        <p
+                            v-if="tournament.description || tournament.rules"
+                            class="description-text"
+                        >
+                            {{ tournament.description || tournament.rules }}
+                        </p>
                         <p v-else class="text-muted">
-                            No specific rules have been provided by the organizer.
+                            No description has been provided by the organizer.
                         </p>
                     </section>
 
@@ -632,12 +640,13 @@ onMounted(async () => {
     padding-bottom: 1.25rem;
     border-bottom: 1px solid #e6e7eb;
 }
-.tournament-header h1 {
+.tournament-title {
     font-size: 3rem;
-    color: #333;
     margin: 0;
+    letter-spacing: 0.3px;
     font-weight: 800;
-    letter-spacing: 0.2px;
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    color: #2b2f36;
 }
 .header-meta {
     display: flex;
@@ -664,7 +673,6 @@ onMounted(async () => {
     display: inline-flex;
     gap: 0.4rem;
 }
-
 .btn-edit,
 .btn-delete,
 .btn-register-team {
@@ -753,6 +761,7 @@ onMounted(async () => {
     border: 1px solid #eaecef;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
 }
+
 .card h2 {
     font-size: 1.25rem;
     color: #111827;
@@ -761,12 +770,45 @@ onMounted(async () => {
     padding-bottom: 0.6rem;
     display: flex;
     align-items: center;
+    font-weight: 800;
+    letter-spacing: 0.2px;
 }
 .card h2 i {
     margin-right: 0.65rem;
     color: #00aeef;
 }
-.rules-text {
+
+.main-content :deep(h2),
+.sidebar-stack :deep(h2) {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    color: #111827;
+    margin: 0 0 0.75rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+.main-content :deep(h2 i),
+.sidebar-stack :deep(h2 i) {
+    color: #00aeef;
+}
+
+:deep(.reviews-card .reviews-header h3) {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    color: #111827;
+    margin: 0 0 0.75rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+:deep(.reviews-card .reviews-header h3 i) {
+    color: #00aeef;
+}
+
+.description-text {
     line-height: 1.7;
     white-space: pre-wrap;
 }
@@ -896,21 +938,5 @@ onMounted(async () => {
 }
 .small-text a:hover {
     text-decoration: underline;
-}
-.main-content :deep(h2),
-.sidebar-stack :deep(h2) {
-    font-size: 1.5rem;
-    font-weight: 800;
-    letter-spacing: 0.2px;
-    color: #111827;
-    margin: 0 0 0.75rem 0;
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-}
-
-.main-content :deep(h2 i),
-.sidebar-stack :deep(h2 i) {
-    color: #00aeef;
 }
 </style>
