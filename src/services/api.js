@@ -40,7 +40,8 @@ apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
         const status = error?.response?.status
-        if ((status === 401 || status === 403) && !isHandlingAuthError) {
+
+        if (status === 401 && !isHandlingAuthError) {
             isHandlingAuthError = true
             try {
                 const { useAuthStore } = await import('@/stores/auth')
@@ -50,17 +51,22 @@ apiClient.interceptors.response.use(
                 } else {
                     localStorage.removeItem('token')
                     localStorage.removeItem('userRole')
-                    try {
-                        const { default: router } = await import('@/router')
-                        router.push('/login')
-                    } catch {
-                        window.location.pathname = '/login'
+                }
+
+                try {
+                    const { default: router } = await import('@/router')
+                    const curr = router.currentRoute.value
+                    if (curr?.name !== 'login') {
+                        router.push({ name: 'login', query: { next: curr?.fullPath || '/' } })
                     }
+                } catch {
+                    window.location.pathname = '/login'
                 }
             } finally {
                 setTimeout(() => (isHandlingAuthError = false), 300)
             }
         }
+
         return Promise.reject(error)
     }
 )

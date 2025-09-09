@@ -5,7 +5,7 @@
 
             <div class="right" v-if="authStore.isLoggedIn">
                 <button
-                    v-if="isFan && !subscribed"
+                    v-if="(isFan || (isPlayer && !isCaptainApproved)) && !subscribed"
                     class="btn sub"
                     @click="subscribe"
                     :disabled="busy"
@@ -14,7 +14,7 @@
                     <i class="fas fa-bell"></i> Subscribe
                 </button>
                 <button
-                    v-if="isFan && subscribed"
+                    v-if="(isFan || (isPlayer && !isCaptainApproved)) && subscribed"
                     class="btn unsub"
                     @click="unsubscribe"
                     :disabled="busy"
@@ -39,7 +39,7 @@
                 v-model.trim="form.text"
                 rows="4"
                 maxlength="4000"
-                placeholder="Write an update for captains and subscribed fans…"
+                placeholder="Write an update for captains and subscribed users…"
             ></textarea>
             <div class="actions">
                 <button class="btn send" :disabled="busy || !form.text" @click="createAnnouncement">
@@ -52,8 +52,11 @@
 
         <div v-if="loading" class="loading"><div class="spinner"></div></div>
 
-        <p v-else-if="isFan && !subscribed" class="hint">
-            Pretplati se kako bi primao/primala obavijesti ovog turnira.
+        <p v-else-if="(isFan || (isPlayer && !isCaptainApproved)) && !subscribed" class="hint">
+            Subscribe to receive this tournament’s announcements.
+        </p>
+        <p v-else-if="!authStore.isLoggedIn" class="hint">
+            Log in to view announcements or subscribe.
         </p>
 
         <ul v-else class="list">
@@ -88,6 +91,17 @@ const form = ref({ title: '', text: '' })
 const busy = ref(false)
 const composeMsg = ref({ type: '', text: '' })
 const subscribed = ref(false)
+const isCaptainApproved = ref(false)
+
+const idOf = (v) => (typeof v === 'string' ? v : v?.$oid || v?.toString?.() || '')
+const idEq = (a, b) => {
+    const sa = idOf(a),
+        sb = idOf(b)
+    return !!sa && !!sb && String(sa) === String(sb)
+}
+
+const isFan = computed(() => authStore.userRole === 'fan')
+const isPlayer = computed(() => authStore.userRole === 'player')
 
 const isOrganizer = computed(() => {
     if (!authStore.isLoggedIn || !props.tournament) return false
@@ -99,27 +113,41 @@ const isOrganizer = computed(() => {
     const orgStr = typeof org === 'string' ? org : org?.$oid || org?.toString?.() || ''
     return me && orgStr && me === orgStr
 })
-const isFan = computed(() => authStore.userRole === 'fan')
-
-const idOf = (v) => (typeof v === 'string' ? v : v?.$oid || v?.toString?.() || '')
 
 const fmt = (v) => {
     try {
-        const o = {
+        return new Date(v).toLocaleString(navigator.language || undefined, {
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
             hour12: false,
-        }
-        return new Date(v).toLocaleString(navigator.language || undefined, o)
+        })
     } catch {
         return ''
     }
 }
 
+async function fetchCaptainApproved() {
+    if (!authStore.isLoggedIn || !isPlayer.value) {
+        isCaptainApproved.value = false
+        return
+    }
+    try {
+        const { data } = await apiClient.get('/api/registrations', {
+            params: { tournamentId: props.tournamentId },
+        })
+        const list = Array.isArray(data) ? data : []
+        isCaptainApproved.value = list.some(
+            (r) => r.status === 'approved' && idEq(r.captain?._id ?? r.captain, authStore.userId)
+        )
+    } catch {
+        isCaptainApproved.value = false
+    }
+}
+
 async function fetchSubscription() {
-    if (!authStore.isLoggedIn || !isFan.value) {
+    if (!authStore.isLoggedIn) {
         subscribed.value = false
         return
     }
@@ -192,8 +220,9 @@ async function unsubscribe() {
 }
 
 onMounted(async () => {
+    await fetchCaptainApproved()
     await fetchSubscription()
-    if (isOrganizer.value || (isFan.value && subscribed.value) || !isFan.value) {
+    if (isOrganizer.value || isCaptainApproved.value || subscribed.value) {
         await fetchAnnouncements()
     } else {
         loading.value = false
