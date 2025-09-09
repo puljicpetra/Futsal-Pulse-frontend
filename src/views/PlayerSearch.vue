@@ -1,7 +1,7 @@
 <template>
     <div class="player-search-page">
         <div class="page-header">
-            <h1>Player Directory</h1>
+            <h1 class="page-title">Player Directory</h1>
         </div>
 
         <div class="search-bar">
@@ -11,11 +11,30 @@
                 v-model="q"
                 type="search"
                 placeholder="Search players by name…"
+                aria-label="Search players by name"
                 @keyup.enter="performSearch(true)"
+                @keydown.esc="clearQuery"
             />
-            <button v-if="q" class="btn-clear" @click="clearQuery" aria-label="Clear">
+            <button v-if="q" class="btn-clear" @click="clearQuery" aria-label="Clear search">
                 <i class="fas fa-times"></i>
             </button>
+        </div>
+
+        <div v-if="showRecents" class="recents">
+            <div class="recents-header">
+                <h2>Recently viewed</h2>
+                <button class="link-clear" @click="clearRecents" aria-label="Clear recently viewed">
+                    Clear
+                </button>
+            </div>
+            <ul class="recents-list">
+                <li v-for="r in recents" :key="r.id">
+                    <button class="recent-chip" @click="goToPlayer(r)">
+                        <img v-if="r.avatar" :src="r.avatar" alt="" />
+                        <span>{{ r.name }}</span>
+                    </button>
+                </li>
+            </ul>
         </div>
 
         <div v-if="hintVisible" class="hint">
@@ -38,7 +57,7 @@
                     v-for="p in items"
                     :key="normalizeId(p._id)"
                     class="card player-card"
-                    @click="goToPlayer(p._id)"
+                    @click="goToPlayer(p)"
                 >
                     <div class="card-header">
                         <img
@@ -56,7 +75,7 @@
                         </div>
                     </div>
 
-                    <button class="btn-open" @click.stop="goToPlayer(p._id)">
+                    <button class="btn-open" @click.stop="goToPlayer(p)">
                         View profile <i class="fas fa-chevron-right"></i>
                     </button>
                 </li>
@@ -96,11 +115,49 @@ const MIN_CHARS = 2
 const pages = computed(() => Math.max(1, Math.ceil((total.value || 0) / limit.value)))
 const hintVisible = computed(() => !q.value && items.value.length === 0 && !isLoading.value)
 
-const normalizeId = (id) => {
+const RECENTS_KEY = 'fp_recent_players'
+const RECENTS_LIMIT = 8
+const recents = ref([])
+
+const showRecents = computed(
+    () => !q.value && recents.value.length > 0 && !isLoading.value && !error.value
+)
+
+function normalizeId(id) {
     if (!id) return null
     if (typeof id === 'string') return id
     if (typeof id === 'object' && typeof id.$oid === 'string') return id.$oid
     return String(id)
+}
+
+function minimalPlayerRecord(p) {
+    return {
+        id: normalizeId(p._id || p.id),
+        name: p.full_name || p.name || p.title || 'Unknown Player',
+        avatar: p.avatarUrl || p.avatar_url || p.avatar || '',
+    }
+}
+
+function loadRecents() {
+    try {
+        const raw = localStorage.getItem(RECENTS_KEY)
+        const parsed = JSON.parse(raw || '[]')
+        recents.value = Array.isArray(parsed) ? parsed.filter((x) => x?.id) : []
+    } catch {
+        recents.value = []
+    }
+}
+
+function saveRecent(p) {
+    const r = minimalPlayerRecord(p)
+    if (!r.id) return
+    recents.value = [r, ...recents.value.filter((x) => x.id !== r.id)].slice(0, RECENTS_LIMIT)
+    localStorage.setItem(RECENTS_KEY, JSON.stringify(recents.value))
+}
+
+function clearRecents() {
+    recents.value = []
+    localStorage.removeItem(RECENTS_KEY)
 }
 
 const performSearch = async (resetPage = false) => {
@@ -160,8 +217,16 @@ const clearQuery = () => {
     syncRouteQuery()
 }
 
-const goToPlayer = (id) => {
-    router.push({ name: 'PlayerProfileStats', params: { id: String(normalizeId(id)) } })
+const goToPlayer = (payload) => {
+    let id = null
+    if (typeof payload === 'object' && payload) {
+        saveRecent(payload)
+        id = normalizeId(payload._id || payload.id)
+    } else {
+        id = normalizeId(payload)
+    }
+    if (!id) return
+    router.push({ name: 'PlayerProfileStats', params: { id: String(id) } })
 }
 
 const syncRouteQuery = () => {
@@ -172,6 +237,8 @@ const syncRouteQuery = () => {
 }
 
 onMounted(() => {
+    loadRecents()
+
     const qParam = typeof route.query.q === 'string' ? route.query.q : ''
     const pageParam = Number(route.query.page || 1)
 
@@ -198,14 +265,19 @@ onBeforeUnmount(() => {
     margin: 2rem auto;
     padding: 1rem;
 }
+
 .page-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     margin-bottom: 1rem;
 }
-.page-header h1 {
+.page-title {
     margin: 0;
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    color: #111827;
 }
 
 .search-bar {
@@ -214,7 +286,7 @@ onBeforeUnmount(() => {
     gap: 0.5rem;
     background: #fff;
     border: 1px solid #e9ecef;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 0.6rem 0.8rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
@@ -226,13 +298,98 @@ onBeforeUnmount(() => {
     border: none;
     outline: none;
     font-size: 1rem;
+    color: #111827;
+    background: transparent;
 }
+.search-bar input[type='search']::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    height: 0;
+    width: 0;
+    margin: 0;
+}
+.search-bar input[type='search']::-ms-clear {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
 .btn-clear {
     background: transparent;
     border: none;
     cursor: pointer;
     color: #94a3b8;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
 }
+.btn-clear:hover {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.recents {
+    margin-top: 1rem;
+}
+.recents-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+.recents-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #111827;
+}
+.link-clear {
+    background: transparent;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.link-clear:hover {
+    color: #374151;
+    text-decoration: underline;
+}
+
+.recents-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.5rem;
+}
+.recent-chip {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #111827;
+    border-radius: 999px;
+    padding: 0.35rem 0.55rem;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, transform 0.05s ease;
+}
+.recent-chip img {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #f1f3f5;
+}
+.recent-chip:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
 .hint {
     color: #6b7280;
     margin: 0.8rem 0 1.2rem;
@@ -247,7 +404,7 @@ onBeforeUnmount(() => {
     width: 26px;
     height: 26px;
     border: 3px solid #e9ecef;
-    border-top-color: #0d6efd;
+    border-top-color: #00aeef;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
