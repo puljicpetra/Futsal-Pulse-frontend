@@ -3,7 +3,9 @@
 Korisničko sučelje aplikacije **Futsal Pulse**, web platforme za organizaciju i praćenje futsal turnira.
 
 > Demo: https://futsal-pulse.netlify.app
+
 > Backend repozitorij: https://github.com/puljicpetra/Futsal-Pulse-backend
+
 > Video: https://youtu.be/9DUIKIaL0Ms
 
 ---
@@ -51,127 +53,97 @@ Korisničko sučelje aplikacije **Futsal Pulse**, web platforme za organizaciju 
 > Korisnici (igrači) inspirirani su stvarnim članovima timova, a avatari su preuzeti sa službenih stranica klubova.
 
 Organizer (1)
-- username: atonic
-- password: atonic12
+- atonic / atonic12
 
 Organizer (2)
-- username: mmaric
-- password: mmaric12
+ mmaric / mmaric12
 
 Organizer (3)
-- username: mhrvotic
-- password: mhrvotic
+- mhrvotic / mhrvotic
 
 Futsal Dinamo:
 Player (kapetan)
-- username: kcekol
-- password: kcekol12
+- kcekol / kcekol12
 
 Players
-- username: mprgomet
-- password: mprgomet
+- mprgomet / mprgomet
 
 
-- username: mmuzar
-- password: mmuzar12
+- mmuzar / mmuzar12
 
 
-- username: apiplica
-- password: apiplica
+- apiplica / apiplica
 
 
-- username: lcigler
-- password: lcigler1
+- lcigler / lcigler1
 
 
-- username: ngudasic
-- password: ngudasic
+- ngudasic / ngudasic
 
 
-- username: dfotak
-- password: dfotak12
+- dfotak / dfotak12
 
 NK Istra 1961
 Player (kapetan)
-- username: sblagojevic
-- password: sblagojevic
+- sblagojevic / sblagojevic
 
 Players
-- username: kfucak
-- password: kfucak12
+- kfucak / kfucak12
 
 
-- username: fkolic
-- password: fkolic12
+- fkolic / fkolic12
 
 
-- username: vrozic
-- password: vrozic12
+- vrozic / vrozic12
 
 
-- username: jpkunst
-- password: jpkunst1
+- jpkunst / jpkunst1
 
 
-- username: lrobertsson
-- password: lrobertsson
+- lrobertsson / lrobertsson
 
 
-- username: mzgomba
-- password: mzgomba1
+- mzgomba / mzgomba1
 
 HNK Hajduk Split
 Player (kapetan)
-- username: mlivaja
-- password: mlivaja1
+- mlivaja / mlivaja1
 
 Players
-- username: iivusic
-- password: iivusic1
+- iivusic / iivusic1
 
 
-- username: dmelnjak
-- password: dmelnjak
+- dmelnjak / dmelnjak
 
 
-- username: bdurdov
-- password: bdurdov1
+- bdurdov / bdurdov1
 
 
-- username: fkrovinovic
-- password: fkrovinovic
+- fkrovinovic / fkrovinovic
 
 
-- username: arebic
-- password: arebic12
+- arebic / arebic12
 
 NK Rijeka
 Player (kapetan)
-- username: tfruk
-- password: tfruk123
+- tfruk / tfruk123
 
 
 Players
-- username: dcop
-- password: dcop1234
+- dcop / dcop1234
 
 
-- username: sradeljic
-- password: sradeljic
+- sradeljic / sradeljic
 
 
-- username: mzlomislic
-- password: mzlomislic
+- mzlomislic / mzlomislic
 
 
-- username: mndockyt
-- password: mndockyt
+- mndockyt / mndockyt
 
 
-- username: lmenalo
-- password: lmenalo
+- lmenalo / lmenalo
 
 
 Fan
-- username: fanfan12
-- password: fanfan12
+- fanfan12 / fanfan12
