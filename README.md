@@ -56,12 +56,14 @@ Organizer (1)
 - atonic / atonic12
 
 Organizer (2)
- mmaric / mmaric12
+- mmaric / mmaric12
 
 Organizer (3)
 - mhrvotic / mhrvotic
 
 Futsal Dinamo:
+
+
 Player (kapetan)
 - kcekol / kcekol12
 
@@ -84,6 +86,8 @@ Players
 - dfotak / dfotak12
 
 NK Istra 1961
+
+
 Player (kapetan)
 - sblagojevic / sblagojevic
 
@@ -106,6 +110,8 @@ Players
 - mzgomba / mzgomba1
 
 HNK Hajduk Split
+
+
 Player (kapetan)
 - mlivaja / mlivaja1
 
@@ -125,6 +131,8 @@ Players
 - arebic / arebic12
 
 NK Rijeka
+
+
 Player (kapetan)
 - tfruk / tfruk123
 
